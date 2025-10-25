@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // For now, we'll skip actual authentication check as it requires Supabase session
-  // In production, you would check for a valid Supabase session cookie
+  // NOTE: Authentication is currently disabled for development/demo purposes
+  // In production with a real Supabase instance, uncomment the authentication logic below
+  // and update the cookie name to match your Supabase project
   
   // Get the pathname
   const { pathname } = request.nextUrl;
@@ -15,10 +16,13 @@ export function middleware(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
   
   if (isProtectedRoute) {
-    // In production, check for authentication token/session here
-    // For now, we'll allow access since we have placeholder credentials
-    // const token = request.cookies.get('sb-access-token');
-    // if (!token) {
+    // TODO: Enable in production with real Supabase credentials
+    // The actual cookie name depends on your Supabase project
+    // Common formats: 'sb-<project-ref>-auth-token' or use Supabase's createServerClient()
+    // 
+    // Example implementation:
+    // const authToken = request.cookies.get('sb-<your-project-ref>-auth-token');
+    // if (!authToken) {
     //   return NextResponse.redirect(new URL('/login', request.url));
     // }
   }

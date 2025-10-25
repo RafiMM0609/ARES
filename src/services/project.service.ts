@@ -27,6 +27,9 @@ export interface ProjectResponse {
   project: ProjectWithRelations;
 }
 
+// Type for creating a project (client_id is set by API from auth session)
+export type CreateProjectData = Omit<ProjectInsert, 'client_id' | 'id' | 'created_at' | 'updated_at'>;
+
 export const projectService = {
   getProjects: async (params?: { status?: string; type?: string }): Promise<ProjectsResponse> => {
     const queryParams = new URLSearchParams();
@@ -41,7 +44,7 @@ export const projectService = {
     return apiClient.get<ProjectResponse>(`/projects/${id}`);
   },
 
-  createProject: async (data: ProjectInsert): Promise<ProjectResponse> => {
+  createProject: async (data: CreateProjectData): Promise<ProjectResponse> => {
     return apiClient.post<ProjectResponse>('/projects', data);
   },
 

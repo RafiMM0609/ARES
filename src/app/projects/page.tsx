@@ -8,7 +8,6 @@ import type { ProjectWithRelations } from '@/services';
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -93,10 +92,6 @@ export default function ProjectsPage() {
         {loading ? (
           <div className="text-center py-12">
             <div className="text-xl text-gray-600">Memuat proyek...</div>
-          </div>
-        ) : error ? (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
-            {error}
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="text-center py-12">

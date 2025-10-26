@@ -33,7 +33,7 @@ export interface InvoiceResponse {
   invoice: InvoiceWithRelations;
 }
 
-export interface CreateInvoiceData extends Omit<InvoiceInsert, 'invoice_number'> {
+export interface CreateInvoiceData extends Omit<InvoiceInsert, 'invoice_number' | 'freelancer_id' | 'id' | 'created_at' | 'updated_at'> {
   items?: Array<{
     description: string;
     quantity: number;

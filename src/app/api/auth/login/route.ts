@@ -74,17 +74,19 @@ export async function POST(request: NextRequest) {
     const tokenHash = await hashSessionToken(token);
     const expiresAt = getTokenExpiration();
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    const sessionData = {
+      user_id: typedUser.id,
+      token_hash: tokenHash,
+      expires_at: expiresAt.toISOString(),
+      ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+      user_agent: request.headers.get('user-agent') || null,
+    };
+
     const { error: sessionError } = await supabase
       .from('user_sessions')
-      .insert({
-        user_id: typedUser.id,
-        token_hash: tokenHash,
-        expires_at: expiresAt.toISOString(),
-        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
-        user_agent: request.headers.get('user-agent') || null,
-      });
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Supabase type inference issue
+      .insert(sessionData);
 
     if (sessionError) {
       console.error('Session creation error:', sessionError);

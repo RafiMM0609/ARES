@@ -62,6 +62,7 @@ For deploying to production:
 - **[DATABASE_SETUP.md](DATABASE_SETUP.md)** - Production Supabase setup guide
 - **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - API reference with examples
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What was built and how to use it
+- **[UX_UI_ANALYSIS_GUIDE.md](UX_UI_ANALYSIS_GUIDE.md)** - UX/UI analysis framework and best practices 🎨
 
 ## 📁 Project Structure
 

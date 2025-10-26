@@ -27,7 +27,10 @@ export default function LoginPage() {
       
       // Get user profile to determine redirect
       const { profile } = await userService.getProfile();
-      const redirectPath = profile.user_type === 'client' ? '/client' : '/freelancer';
+      
+      // Redirect based on user type
+      // For 'both' users, default to client dashboard
+      const redirectPath = profile.user_type === 'freelancer' ? '/freelancer' : '/client';
       router.push(redirectPath);
     } catch (err: unknown) {
       if (err instanceof Error) {

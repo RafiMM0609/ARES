@@ -1,6 +1,7 @@
 // src/app/api/invoices/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { getUserFromRequest } from '@/lib/auth';
 
 // Get a single invoice
 export async function GET(
@@ -9,18 +10,20 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = getServiceSupabase();
 
     const { data: invoice, error } = await supabase
       .from('invoices')
       .select(`
         *,
-        client:profiles!client_id(id, full_name, email, country),
-        freelancer:profiles!freelancer_id(id, full_name, email, country),
+        client:users!client_id(id, full_name, email, country),
+        freelancer:users!freelancer_id(id, full_name, email, country),
         project:projects(id, title),
         items:invoice_items(*),
         payments:payments(*)
@@ -33,8 +36,7 @@ export async function GET(
     }
 
     // Check if user has access to this invoice
-    // @ts-expect-error - Supabase types are complex with joins
-    if (invoice.client_id !== user.id && invoice.freelancer_id !== user.id) {
+    if (invoice.client_id !== user.userId && invoice.freelancer_id !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -55,14 +57,16 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { status, amount, due_date, description, notes } = body;
+
+    const supabase = getServiceSupabase();
 
     // Check if user has permission to update
     const { data: existingInvoice } = await supabase
@@ -75,26 +79,23 @@ export async function PUT(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Freelancer can only update draft invoices
-    if (existingInvoice.freelancer_id === user.id && existingInvoice.status !== 'draft') {
+    if (existingInvoice.freelancer_id === user.userId && existingInvoice.status !== 'draft') {
       return NextResponse.json({ 
         error: 'Can only update draft invoices' 
       }, { status: 403 });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Client can update status (e.g., mark as paid)
-    if (existingInvoice.client_id === user.id) {
+    if (existingInvoice.client_id === user.userId) {
       const { data: invoice, error } = await supabase
         .from('invoices')
-        // @ts-expect-error - complex types
         .update({ status })
         .eq('id', id)
         .select(`
           *,
-          client:profiles!client_id(id, full_name, email),
-          freelancer:profiles!freelancer_id(id, full_name, email)
+          client:users!client_id(id, full_name, email),
+          freelancer:users!freelancer_id(id, full_name, email)
         `)
         .single();
 
@@ -108,12 +109,10 @@ export async function PUT(
       });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Freelancer updates invoice details
-    if (existingInvoice.freelancer_id === user.id) {
+    if (existingInvoice.freelancer_id === user.userId) {
       const { data: invoice, error } = await supabase
         .from('invoices')
-        // @ts-expect-error - complex types
         .update({
           amount,
           due_date,
@@ -124,8 +123,8 @@ export async function PUT(
         .eq('id', id)
         .select(`
           *,
-          client:profiles!client_id(id, full_name, email),
-          freelancer:profiles!freelancer_id(id, full_name, email)
+          client:users!client_id(id, full_name, email),
+          freelancer:users!freelancer_id(id, full_name, email)
         `)
         .single();
 
@@ -156,11 +155,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = getServiceSupabase();
 
     // Check if user is the freelancer who created the invoice
     const { data: existingInvoice } = await supabase
@@ -173,12 +174,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
-    // @ts-expect-error - Supabase types with select
-    if (existingInvoice.freelancer_id !== user.id) {
+    if (existingInvoice.freelancer_id !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Only allow deleting draft invoices
     if (existingInvoice.status !== 'draft') {
       return NextResponse.json({ 

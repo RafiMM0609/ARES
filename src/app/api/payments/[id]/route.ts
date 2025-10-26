@@ -1,6 +1,7 @@
 // src/app/api/payments/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { getUserFromRequest } from '@/lib/auth';
 
 // Get a single payment
 export async function GET(
@@ -9,18 +10,20 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = getServiceSupabase();
 
     const { data: payment, error } = await supabase
       .from('payments')
       .select(`
         *,
-        payer:profiles!payer_id(id, full_name, email),
-        payee:profiles!payee_id(id, full_name, email),
+        payer:users!payer_id(id, full_name, email),
+        payee:users!payee_id(id, full_name, email),
         invoice:invoices(id, invoice_number, amount, description)
       `)
       .eq('id', id)
@@ -30,9 +33,8 @@ export async function GET(
       return NextResponse.json({ error: error?.message || 'Payment not found' }, { status: 400 });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Check if user has access to this payment
-    if (payment.payer_id !== user.id && payment.payee_id !== user.id) {
+    if (payment.payer_id !== user.userId && payment.payee_id !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -53,9 +55,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -69,6 +71,8 @@ export async function PUT(
       );
     }
 
+    const supabase = getServiceSupabase();
+
     // Check if user has permission to update
     const { data: existingPayment } = await supabase
       .from('payments')
@@ -80,9 +84,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Only payer can update payment
-    if (existingPayment.payer_id !== user.id) {
+    if (existingPayment.payer_id !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -102,13 +105,12 @@ export async function PUT(
 
     const { data: payment, error } = await supabase
       .from('payments')
-      // @ts-expect-error - Supabase update types
       .update(updateData)
       .eq('id', id)
       .select(`
         *,
-        payer:profiles!payer_id(id, full_name, email),
-        payee:profiles!payee_id(id, full_name, email)
+        payer:users!payer_id(id, full_name, email),
+        payee:users!payee_id(id, full_name, email)
       `)
       .single();
 
@@ -120,12 +122,10 @@ export async function PUT(
     if (status === 'completed') {
       await supabase
         .from('invoices')
-        // @ts-expect-error - Supabase update types
         .update({ 
           status: 'paid',
           paid_date: new Date().toISOString(),
         })
-        // @ts-expect-error - existingPayment type
         .eq('id', existingPayment.invoice_id);
     }
 

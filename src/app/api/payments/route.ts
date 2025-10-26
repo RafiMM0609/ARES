@@ -1,28 +1,31 @@
 // src/app/api/payments/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { getUserFromRequest } from '@/lib/auth';
 
 // Get all payments (filtered by user)
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
+    const supabase = getServiceSupabase();
+
     let query = supabase
       .from('payments')
       .select(`
         *,
-        payer:profiles!payer_id(id, full_name, email),
-        payee:profiles!payee_id(id, full_name, email),
+        payer:users!payer_id(id, full_name, email),
+        payee:users!payee_id(id, full_name, email),
         invoice:invoices(id, invoice_number, amount)
       `)
-      .or(`payer_id.eq.${user.id},payee_id.eq.${user.id}`);
+      .or(`payer_id.eq.${user.userId},payee_id.eq.${user.userId}`);
 
     if (status) {
       query = query.eq('status', status);
@@ -49,9 +52,9 @@ export async function GET(request: NextRequest) {
 // Create a new payment
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -65,6 +68,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = getServiceSupabase();
+
     // Verify the invoice exists and user is the client
     const { data: invoice } = await supabase
       .from('invoices')
@@ -76,8 +81,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
-    // @ts-expect-error - Supabase types with select
-    if (invoice.client_id !== user.id) {
+    if (invoice.client_id !== user.userId) {
       return NextResponse.json({ 
         error: 'Only the client can make payment for this invoice' 
       }, { status: 403 });
@@ -86,10 +90,9 @@ export async function POST(request: NextRequest) {
     // Create payment
     const { data: payment, error } = await supabase
       .from('payments')
-      // @ts-expect-error - Supabase insert types
       .insert({
         invoice_id,
-        payer_id: user.id,
+        payer_id: user.userId,
         payee_id,
         amount,
         currency: currency || 'USD',
@@ -100,8 +103,8 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        payer:profiles!payer_id(id, full_name, email),
-        payee:profiles!payee_id(id, full_name, email),
+        payer:users!payer_id(id, full_name, email),
+        payee:users!payee_id(id, full_name, email),
         invoice:invoices(id, invoice_number)
       `)
       .single();

@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { verifyToken } from '@/lib/auth';
+import type { Database } from '@/lib/database.types';
+
+type UserRow = Database['public']['Tables']['users']['Row'];
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,7 +41,7 @@ export async function GET(request: NextRequest) {
     // Get user data
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address')
+      .select('id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active')
       .eq('id', payload.userId)
       .single();
 
@@ -46,8 +49,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ session: null });
     }
 
+    // Type assertion for the user object
+    const typedUser = user as Pick<UserRow, 'id' | 'email' | 'full_name' | 'user_type' | 'avatar_url' | 'bio' | 'country' | 'timezone' | 'wallet_address' | 'is_active'>;
+
     // Check if user is active
-    if (!user.is_active) {
+    if (!typedUser.is_active) {
       return NextResponse.json({ session: null });
     }
 
@@ -55,15 +61,15 @@ export async function GET(request: NextRequest) {
       session: {
         access_token: token,
         user: {
-          id: user.id,
-          email: user.email,
-          full_name: user.full_name,
-          user_type: user.user_type,
-          avatar_url: user.avatar_url,
-          bio: user.bio,
-          country: user.country,
-          timezone: user.timezone,
-          wallet_address: user.wallet_address,
+          id: typedUser.id,
+          email: typedUser.email,
+          full_name: typedUser.full_name,
+          user_type: typedUser.user_type,
+          avatar_url: typedUser.avatar_url,
+          bio: typedUser.bio,
+          country: typedUser.country,
+          timezone: typedUser.timezone,
+          wallet_address: typedUser.wallet_address,
         },
       },
     });

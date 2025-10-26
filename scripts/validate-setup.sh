@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ARES Supabase Setup Validation Script
 # This script validates the Supabase installation and setup
@@ -54,7 +54,7 @@ else
 fi
 
 if [ -d "supabase/migrations" ]; then
-    MIGRATION_COUNT=$(ls -1 supabase/migrations/*.sql 2>/dev/null | wc -l)
+    MIGRATION_COUNT=$(find supabase/migrations -name '*.sql' -type f 2>/dev/null | wc -l)
     echo "  ✅ Found $MIGRATION_COUNT migration(s)"
 else
     echo "  ❌ supabase/migrations directory not found"

@@ -145,7 +145,7 @@ Create a new invoice (freelancer only).
 }
 ```
 
-**Note:** Invoice numbers are auto-generated (format: `INV-YYYYMM-XXXX`)
+**Note:** Invoice numbers are auto-generated (format: `INV-YYYYMM-XXXX` where XXXX is a sequential 4-digit number)
 
 #### GET /api/invoices/[id]
 Get a specific invoice with items and payments.

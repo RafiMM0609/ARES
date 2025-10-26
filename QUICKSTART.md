@@ -126,7 +126,6 @@ curl -X POST http://localhost:3000/api/invoices \
   -H "Content-Type: application/json" \
   -d '{
     "client_id": "your-client-id",
-    "freelancer_id": "your-freelancer-id",
     "amount": 1000,
     "items": [
       {
@@ -136,6 +135,9 @@ curl -X POST http://localhost:3000/api/invoices \
       }
     ]
   }'
+```
+
+**Note**: The freelancer_id is automatically set from the authenticated user.
 ```
 
 ## 🛠️ Development Commands

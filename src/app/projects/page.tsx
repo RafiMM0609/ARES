@@ -55,7 +55,11 @@ export default function ProjectsPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Mock Data Notification */}
         {usingMockData && (
-          <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg">
+          <div 
+            className="mb-6 bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg"
+            role="alert"
+            aria-live="polite"
+          >
             <strong>Mode Demo:</strong> Menampilkan data contoh. Untuk melihat proyek real, silakan setup Supabase credentials.
           </div>
         )}

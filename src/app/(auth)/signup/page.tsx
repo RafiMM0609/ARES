@@ -42,7 +42,8 @@ export default function SignupPage() {
       });
       
       // Redirect based on user type
-      const redirectPath = formData.user_type === 'client' ? '/client' : '/freelancer';
+      // For 'both' users, default to client dashboard
+      const redirectPath = formData.user_type === 'freelancer' ? '/freelancer' : '/client';
       router.push(redirectPath);
     } catch (err: unknown) {
       if (err instanceof Error) {

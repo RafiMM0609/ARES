@@ -8,9 +8,10 @@ Solusi pembayaran lintas batas instan untuk freelancer.
 
 - Node.js 18.x or later
 - npm or yarn
-- Supabase account (sign up at https://supabase.com)
+- Docker Desktop (for local development)
+- Supabase account (for production deployment)
 
-### Installation
+### Local Development Setup
 
 1. Clone the repository:
 ```bash
@@ -23,14 +24,18 @@ cd ARES
 npm install
 ```
 
-3. Set up Supabase database:
-   - See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed instructions
-   - Run the SQL schema from `supabase-schema.sql` in your Supabase project
+3. Start local Supabase instance:
+```bash
+npm run supabase:start
+```
+   - See **[SUPABASE_LOCAL_SETUP.md](SUPABASE_LOCAL_SETUP.md)** for detailed local development guide
+   - This will start a local Supabase instance with Docker
+   - Copy the API URL and keys shown in the output
 
 4. Configure environment variables:
 ```bash
 cp .env.example .env.local
-# Edit .env.local with your Supabase credentials
+# Edit .env.local with your local Supabase credentials
 ```
 
 5. Run the development server:
@@ -40,9 +45,17 @@ npm run dev
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### Production Setup
+
+For deploying to production:
+- See **[DATABASE_SETUP.md](DATABASE_SETUP.md)** for cloud Supabase setup
+- Create a Supabase project at https://supabase.com
+- Push migrations: `npx supabase db push`
+
 ## 📚 Documentation
 
-- **[DATABASE_SETUP.md](DATABASE_SETUP.md)** - Complete database setup guide
+- **[SUPABASE_LOCAL_SETUP.md](SUPABASE_LOCAL_SETUP.md)** - Local development with Supabase
+- **[DATABASE_SETUP.md](DATABASE_SETUP.md)** - Production Supabase setup guide
 - **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - API reference with examples
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What was built and how to use it
 

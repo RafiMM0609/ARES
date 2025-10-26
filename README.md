@@ -45,6 +45,8 @@ npm run dev
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+**Tip**: Run `./scripts/validate-setup.sh` to verify your setup is correct before starting.
+
 ### Production Setup
 
 For deploying to production:
@@ -54,6 +56,8 @@ For deploying to production:
 
 ## 📚 Documentation
 
+- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute quick start guide ⚡
+- **[INSTALLATION.md](INSTALLATION.md)** - Comprehensive installation guide
 - **[SUPABASE_LOCAL_SETUP.md](SUPABASE_LOCAL_SETUP.md)** - Local development with Supabase
 - **[DATABASE_SETUP.md](DATABASE_SETUP.md)** - Production Supabase setup guide
 - **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - API reference with examples

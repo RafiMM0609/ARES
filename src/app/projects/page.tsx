@@ -10,6 +10,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [usingMockData, setUsingMockData] = useState(false);
 
   useEffect(() => {
     loadProjects();
@@ -22,10 +23,12 @@ export default function ProjectsPage() {
         status: 'open' 
       });
       setProjects(projects);
+      setUsingMockData(false);
     } catch (err) {
       // If API fails, use mock data for demonstration
       console.error('Failed to load projects, using mock data:', err);
       setProjects(mockProjects);
+      setUsingMockData(true);
     } finally {
       setLoading(false);
     }
@@ -50,6 +53,13 @@ export default function ProjectsPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Mock Data Notification */}
+        {usingMockData && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg">
+            <strong>Mode Demo:</strong> Menampilkan data contoh. Untuk melihat proyek real, silakan setup Supabase credentials.
+          </div>
+        )}
+
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <div className="grid md:grid-cols-2 gap-4">

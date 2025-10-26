@@ -60,7 +60,7 @@ When logged in as a Freelancer, you can:
 1. **Browse Available Projects** (`/freelancer` dashboard)
    - View all open projects posted by clients
    - See project budgets, deadlines, and descriptions
-   - Apply for projects (coming feature)
+   - Apply button available (backend ready, full implementation pending)
 
 2. **Manage Your Projects**
    - Track projects you're working on

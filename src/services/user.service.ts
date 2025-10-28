@@ -2,12 +2,12 @@
 import { apiClient } from './api-client';
 import type { Database } from '@/lib/database.types';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+type User = Database['public']['Tables']['users']['Row'];
+type UserUpdate = Database['public']['Tables']['users']['Update'];
 type Skill = Database['public']['Tables']['skills']['Row'];
 
 export interface ProfileResponse {
-  profile: Profile;
+  profile: Omit<User, 'password_hash'>;
 }
 
 export interface SkillsResponse {
@@ -19,7 +19,7 @@ export const userService = {
     return apiClient.get<ProfileResponse>('/users/profile');
   },
 
-  updateProfile: async (data: ProfileUpdate): Promise<ProfileResponse> => {
+  updateProfile: async (data: Partial<UserUpdate>): Promise<ProfileResponse> => {
     return apiClient.put<ProfileResponse>('/users/profile', data);
   },
 

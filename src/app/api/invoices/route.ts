@@ -1,29 +1,32 @@
 // src/app/api/invoices/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getServiceSupabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { getUserFromRequest } from '@/lib/auth';
 
 // Get all invoices (filtered by user)
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
+    const supabase = getServiceSupabase();
+
     let query = supabase
       .from('invoices')
       .select(`
         *,
-        client:profiles!client_id(id, full_name, email),
-        freelancer:profiles!freelancer_id(id, full_name, email),
+        client:users!client_id(id, full_name, email),
+        freelancer:users!freelancer_id(id, full_name, email),
         project:projects(id, title),
         items:invoice_items(*)
       `)
-      .or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`);
+      .or(`client_id.eq.${user.userId},freelancer_id.eq.${user.userId}`);
 
     if (status) {
       query = query.eq('status', status);
@@ -50,9 +53,9 @@ export async function GET(request: NextRequest) {
 // Create a new invoice
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -77,14 +80,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Create invoice
-    const { data: invoice, error } = await supabase
+    const { data: invoice, error } = await serviceSupabase
       .from('invoices')
-      // @ts-expect-error - Supabase complex insert types
       .insert({
         invoice_number: invoiceNumberData,
         project_id,
         client_id,
-        freelancer_id: user.id,
+        freelancer_id: user.userId,
         amount,
         currency: currency || 'USD',
         due_date,
@@ -94,8 +96,8 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        client:profiles!client_id(id, full_name, email),
-        freelancer:profiles!freelancer_id(id, full_name, email),
+        client:users!client_id(id, full_name, email),
+        freelancer:users!freelancer_id(id, full_name, email),
         project:projects(id, title)
       `)
       .single();
@@ -107,7 +109,6 @@ export async function POST(request: NextRequest) {
     // Create invoice items if provided
     if (items && items.length > 0) {
       const invoiceItems = items.map((item: { description: string; quantity: number; unit_price: number }) => ({
-        // @ts-expect-error - invoice type after null check
         invoice_id: invoice.id,
         description: item.description,
         quantity: item.quantity || 1,
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
         total: (item.quantity || 1) * item.unit_price,
       }));
 
-      await supabase
+      await serviceSupabase
         .from('invoice_items')
         .insert(invoiceItems);
     }

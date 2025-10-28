@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifyToken } from '@/lib/auth';
 
 export function middleware(request: NextRequest) {
-  // NOTE: Authentication is currently disabled for development/demo purposes
-  // In production with a real Supabase instance, uncomment the authentication logic below
-  // and update the cookie name to match your Supabase project
-  
   // Get the pathname
   const { pathname } = request.nextUrl;
 
@@ -16,15 +13,43 @@ export function middleware(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
   
   if (isProtectedRoute) {
-    // TODO: Enable in production with real Supabase credentials
-    // The actual cookie name depends on your Supabase project
-    // Common formats: 'sb-<project-ref>-auth-token' or use Supabase's createServerClient()
-    // 
-    // Example implementation:
-    // const authToken = request.cookies.get('sb-<your-project-ref>-auth-token');
-    // if (!authToken) {
-    //   return NextResponse.redirect(new URL('/login', request.url));
-    // }
+    // Get auth token from cookie
+    const token = request.cookies.get('auth_token')?.value;
+    
+    // If no token, redirect to login
+    if (!token) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    // Verify token
+    const payload = verifyToken(token);
+    
+    // If token is invalid or expired, redirect to login
+    if (!payload) {
+      // Clear invalid token
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.set('auth_token', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 0,
+        path: '/',
+      });
+      return response;
+    }
+
+    // Token is valid, allow access
+    // Optionally add user info to request headers for use in pages
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-user-id', payload.userId);
+    requestHeaders.set('x-user-email', payload.email);
+    requestHeaders.set('x-user-type', payload.userType);
+
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   return NextResponse.next();

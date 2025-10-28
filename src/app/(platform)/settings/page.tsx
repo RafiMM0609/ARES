@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import { userService } from '@/services';
 import type { Database } from '@/lib/database.types';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+type User = Database['public']['Tables']['users']['Row'];
+type UserUpdate = Database['public']['Tables']['users']['Update'];
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [formData, setFormData] = useState<ProfileUpdate>({});
+  const [profile, setProfile] = useState<Omit<User, 'password_hash'> | null>(null);
+  const [formData, setFormData] = useState<Partial<UserUpdate>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

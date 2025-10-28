@@ -1,10 +1,13 @@
 // src/app/api/users/skills/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { getUserFromRequest } from '@/lib/auth';
 
 // Get all available skills
 export async function GET(_request: NextRequest) {
   try {
+    const supabase = getServiceSupabase();
+
     const { data: skills, error } = await supabase
       .from('skills')
       .select('*')
@@ -27,9 +30,9 @@ export async function GET(_request: NextRequest) {
 // Add a new skill to the database
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -43,9 +46,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = getServiceSupabase();
+
     const { data: skill, error } = await supabase
       .from('skills')
-      // @ts-expect-error - Supabase insert types
       .insert({ name, category })
       .select()
       .single();

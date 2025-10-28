@@ -1,13 +1,14 @@
 // src/app/api/projects/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { getUserFromRequest } from '@/lib/auth';
 
 // Get all projects (filtered by user)
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -15,22 +16,24 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const type = searchParams.get('type'); // 'my_projects' or 'available'
 
+    const supabase = getServiceSupabase();
+
     let query = supabase
       .from('projects')
       .select(`
         *,
-        client:profiles!client_id(id, full_name, email),
-        freelancer:profiles!freelancer_id(id, full_name, email)
+        client:users!client_id(id, full_name, email),
+        freelancer:users!freelancer_id(id, full_name, email)
       `);
 
     // Filter based on type
     if (type === 'my_projects') {
-      query = query.or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`);
+      query = query.or(`client_id.eq.${user.userId},freelancer_id.eq.${user.userId}`);
     } else if (type === 'available') {
       query = query.is('freelancer_id', null).eq('status', 'open');
     } else {
       // Default: show user's projects
-      query = query.or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`);
+      query = query.or(`client_id.eq.${user.userId},freelancer_id.eq.${user.userId}`);
     }
 
     // Filter by status if provided
@@ -59,9 +62,9 @@ export async function GET(request: NextRequest) {
 // Create a new project
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -75,13 +78,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = getServiceSupabase();
+
     const { data: project, error } = await supabase
       .from('projects')
-      // @ts-expect-error - Supabase insert types
       .insert({
         title,
         description,
-        client_id: user.id,
+        client_id: user.userId,
         budget_amount,
         budget_currency: budget_currency || 'USD',
         deadline,
@@ -89,7 +93,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        client:profiles!client_id(id, full_name, email)
+        client:users!client_id(id, full_name, email)
       `)
       .single();
 

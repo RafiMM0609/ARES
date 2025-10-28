@@ -10,10 +10,11 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
+      users: {
         Row: {
           id: string
           email: string
+          password_hash: string
           full_name: string | null
           user_type: 'client' | 'freelancer' | 'both'
           avatar_url: string | null
@@ -21,12 +22,16 @@ export interface Database {
           country: string | null
           timezone: string | null
           wallet_address: string | null
+          is_active: boolean
+          email_verified: boolean
+          last_login_at: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
-          id: string
+          id?: string
           email: string
+          password_hash: string
           full_name?: string | null
           user_type?: 'client' | 'freelancer' | 'both'
           avatar_url?: string | null
@@ -34,12 +39,16 @@ export interface Database {
           country?: string | null
           timezone?: string | null
           wallet_address?: string | null
+          is_active?: boolean
+          email_verified?: boolean
+          last_login_at?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           email?: string
+          password_hash?: string
           full_name?: string | null
           user_type?: 'client' | 'freelancer' | 'both'
           avatar_url?: string | null
@@ -47,8 +56,40 @@ export interface Database {
           country?: string | null
           timezone?: string | null
           wallet_address?: string | null
+          is_active?: boolean
+          email_verified?: boolean
+          last_login_at?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      user_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          token_hash: string
+          expires_at: string
+          created_at: string
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          token_hash: string
+          expires_at: string
+          created_at?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          token_hash?: string
+          expires_at?: string
+          created_at?: string
+          ip_address?: string | null
+          user_agent?: string | null
         }
       }
       skills: {

@@ -1,19 +1,30 @@
 // src/app/api/users/profile/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { verifyToken } from '@/lib/auth';
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get token from cookie
+    const token = request.cookies.get('auth_token')?.value;
 
-    if (authError || !user) {
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Verify token
+    const payload = verifyToken(token);
+
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const supabase = getServiceSupabase();
+
     const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
+      .from('users')
+      .select('id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active, email_verified, created_at, updated_at')
+      .eq('id', payload.userId)
       .single();
 
     if (error) {
@@ -32,18 +43,27 @@ export async function GET(_request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get token from cookie
+    const token = request.cookies.get('auth_token')?.value;
 
-    if (authError || !user) {
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify token
+    const payload = verifyToken(token);
+
+    if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { full_name, bio, country, timezone, wallet_address, avatar_url, user_type } = body;
 
+    const supabase = getServiceSupabase();
+
     const { data: profile, error } = await supabase
-      .from('profiles')
-      // @ts-expect-error - Supabase update types
+      .from('users')
       .update({
         full_name,
         bio,
@@ -53,8 +73,8 @@ export async function PUT(request: NextRequest) {
         avatar_url,
         user_type,
       })
-      .eq('id', user.id)
-      .select()
+      .eq('id', payload.userId)
+      .select('id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active, email_verified, created_at, updated_at')
       .single();
 
     if (error) {

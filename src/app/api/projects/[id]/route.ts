@@ -1,6 +1,7 @@
 // src/app/api/projects/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { getUserFromRequest } from '@/lib/auth';
 
 // Get a single project
 export async function GET(
@@ -9,18 +10,20 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = getServiceSupabase();
 
     const { data: project, error } = await supabase
       .from('projects')
       .select(`
         *,
-        client:profiles!client_id(id, full_name, email, avatar_url),
-        freelancer:profiles!freelancer_id(id, full_name, email, avatar_url),
+        client:users!client_id(id, full_name, email, avatar_url),
+        freelancer:users!freelancer_id(id, full_name, email, avatar_url),
         milestones:project_milestones(*)
       `)
       .eq('id', id)
@@ -30,9 +33,8 @@ export async function GET(
       return NextResponse.json({ error: error?.message || 'Project not found' }, { status: 400 });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Check if user has access to this project
-    if (project.client_id !== user.id && project.freelancer_id !== user.id && project.status !== 'open') {
+    if (project.client_id !== user.userId && project.freelancer_id !== user.userId && project.status !== 'open') {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -53,14 +55,16 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { title, description, budget_amount, budget_currency, deadline, status, freelancer_id } = body;
+
+    const supabase = getServiceSupabase();
 
     // First check if user has permission to update this project
     const { data: existingProject } = await supabase
@@ -73,15 +77,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // @ts-expect-error - Supabase types with select
     // Only client can update project details
-    if (existingProject.client_id !== user.id) {
+    if (existingProject.client_id !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const { data: project, error } = await supabase
       .from('projects')
-      // @ts-expect-error - Supabase update types
       .update({
         title,
         description,
@@ -94,8 +96,8 @@ export async function PUT(
       .eq('id', id)
       .select(`
         *,
-        client:profiles!client_id(id, full_name, email),
-        freelancer:profiles!freelancer_id(id, full_name, email)
+        client:users!client_id(id, full_name, email),
+        freelancer:users!freelancer_id(id, full_name, email)
       `)
       .single();
 
@@ -123,11 +125,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = getUserFromRequest(request);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = getServiceSupabase();
 
     // Check if user is the client who created the project
     const { data: existingProject } = await supabase
@@ -140,8 +144,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // @ts-expect-error - Supabase types with select
-    if (existingProject.client_id !== user.id) {
+    if (existingProject.client_id !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 

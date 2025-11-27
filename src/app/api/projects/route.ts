@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       freelancer: row.freelancer_id_ref ? {
         id: row.freelancer_id_ref,
         full_name: row.freelancer_full_name,
-        email: row.freelancer_email!,
+        email: row.freelancer_email ?? '',
       } : null,
     }));
 

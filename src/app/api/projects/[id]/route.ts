@@ -93,7 +93,7 @@ export async function GET(
       freelancer: row.freelancer_id_ref ? {
         id: row.freelancer_id_ref,
         full_name: row.freelancer_full_name,
-        email: row.freelancer_email!,
+        email: row.freelancer_email ?? '',
         avatar_url: row.freelancer_avatar_url,
       } : null,
       milestones,

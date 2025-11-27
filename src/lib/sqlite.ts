@@ -52,7 +52,7 @@ function initializeSchema(database: Database.Database) {
   database.exec(`
     -- Users table
     CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       full_name TEXT,
@@ -71,7 +71,7 @@ function initializeSchema(database: Database.Database) {
 
     -- User sessions table
     CREATE TABLE IF NOT EXISTS user_sessions (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       token_hash TEXT NOT NULL,
       expires_at TEXT NOT NULL,
@@ -82,7 +82,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Skills table
     CREATE TABLE IF NOT EXISTS skills (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
       category TEXT,
       created_at TEXT DEFAULT (datetime('now'))
@@ -90,7 +90,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Freelancer skills junction table
     CREATE TABLE IF NOT EXISTS freelancer_skills (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       freelancer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       skill_id TEXT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
       proficiency_level TEXT CHECK (proficiency_level IN ('beginner', 'intermediate', 'advanced', 'expert')) DEFAULT 'intermediate',
@@ -100,7 +100,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Projects table
     CREATE TABLE IF NOT EXISTS projects (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT,
       client_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -117,7 +117,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Project milestones table
     CREATE TABLE IF NOT EXISTS project_milestones (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       description TEXT,
@@ -131,7 +131,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Invoices table
     CREATE TABLE IF NOT EXISTS invoices (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       invoice_number TEXT UNIQUE NOT NULL,
       project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
       client_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -150,7 +150,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Invoice items table
     CREATE TABLE IF NOT EXISTS invoice_items (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
       description TEXT NOT NULL,
       quantity REAL DEFAULT 1,
@@ -161,7 +161,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Payments table
     CREATE TABLE IF NOT EXISTS payments (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
       payer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       payee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -178,7 +178,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Reviews table
     CREATE TABLE IF NOT EXISTS reviews (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       reviewer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       reviewee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -191,7 +191,7 @@ function initializeSchema(database: Database.Database) {
 
     -- Notifications table
     CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       type TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -238,20 +238,25 @@ function initializeSchema(database: Database.Database) {
 }
 
 /**
- * Generate invoice number
+ * Generate invoice number with transaction to prevent race conditions
  */
 export function generateInvoiceNumber(): string {
-  const db = getDatabase();
+  const database = getDatabase();
   const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
   
-  const result = db.prepare(`
-    SELECT COALESCE(MAX(CAST(SUBSTR(invoice_number, 9) AS INTEGER)), 0) + 1 as seq
-    FROM invoices
-    WHERE invoice_number LIKE 'INV-' || ? || '%'
-  `).get(yearMonth) as { seq: number };
+  // Use a transaction to prevent race conditions
+  const generateNumber = database.transaction(() => {
+    const result = database.prepare(`
+      SELECT COALESCE(MAX(CAST(SUBSTR(invoice_number, 13) AS INTEGER)), 0) + 1 as seq
+      FROM invoices
+      WHERE invoice_number LIKE 'INV-' || ? || '-%'
+    `).get(yearMonth) as { seq: number } | undefined;
+    
+    const sequenceNum = result?.seq || 1;
+    return `INV-${yearMonth}-${sequenceNum.toString().padStart(4, '0')}`;
+  });
   
-  const sequenceNum = result?.seq || 1;
-  return `INV-${yearMonth}-${sequenceNum.toString().padStart(4, '0')}`;
+  return generateNumber();
 }
 
 /**

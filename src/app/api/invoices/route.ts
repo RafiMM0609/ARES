@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
         },
         project: row.project_id_ref ? {
           id: row.project_id_ref,
-          title: row.project_title!,
+          title: row.project_title ?? '',
         } : null,
         items,
       };

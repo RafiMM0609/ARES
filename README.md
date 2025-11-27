@@ -8,8 +8,6 @@ Solusi pembayaran lintas batas instan untuk freelancer.
 
 - Node.js 18.x or later
 - npm or yarn
-- Docker Desktop (for local development)
-- Supabase account (for production deployment)
 
 ### Local Development Setup
 
@@ -24,42 +22,25 @@ cd ARES
 npm install
 ```
 
-3. Start local Supabase instance:
-```bash
-npm run supabase:start
-```
-   - See **[SUPABASE_LOCAL_SETUP.md](SUPABASE_LOCAL_SETUP.md)** for detailed local development guide
-   - This will start a local Supabase instance with Docker
-   - Copy the API URL and keys shown in the output
-
-4. Configure environment variables:
+3. Configure environment variables:
 ```bash
 cp .env.example .env.local
-# Edit .env.local with your local Supabase credentials
+# Edit .env.local with your configuration
 ```
 
-5. Run the development server:
+4. Run the development server:
 ```bash
 npm run dev
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-**Tip**: Run `./scripts/validate-setup.sh` to verify your setup is correct before starting.
-
-### Production Setup
-
-For deploying to production:
-- See **[DATABASE_SETUP.md](DATABASE_SETUP.md)** for cloud Supabase setup
-- Create a Supabase project at https://supabase.com
-- Push migrations: `npx supabase db push`
+The SQLite database will be automatically created in the `data/` directory on first run.
 
 ## 📚 Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - 5-minute quick start guide ⚡
 - **[INSTALLATION.md](INSTALLATION.md)** - Comprehensive installation guide
-- **[SUPABASE_LOCAL_SETUP.md](SUPABASE_LOCAL_SETUP.md)** - Local development with Supabase
-- **[DATABASE_SETUP.md](DATABASE_SETUP.md)** - Production Supabase setup guide
 - **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - API reference with examples
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What was built and how to use it
 - **[UX_UI_ANALYSIS_GUIDE.md](UX_UI_ANALYSIS_GUIDE.md)** - UX/UI analysis framework and best practices 🎨
@@ -89,7 +70,8 @@ src/
 │   ├── page.tsx            # Landing page
 │   └── globals.css         # Global styles
 ├── lib/
-│   ├── supabase.ts         # Supabase client configuration
+│   ├── sqlite.ts           # SQLite database configuration
+│   ├── auth.ts             # Authentication utilities
 │   └── database.types.ts   # TypeScript database types
 └── services/               # Service layer for API calls
     ├── api-client.ts       # Base HTTP client
@@ -106,8 +88,11 @@ src/
 ### Pages
 - `/` - Landing page
 - `/login` - Login page
+- `/signup` - Signup page
 - `/client` - Client dashboard
 - `/freelancer` - Freelancer dashboard
+- `/projects` - Projects page
+- `/settings` - Settings page
 
 ### API Endpoints
 - **Auth**: `/api/auth/signup`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/session`
@@ -122,7 +107,7 @@ src/
 - [React 19](https://react.dev/) - UI library
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 - [Tailwind CSS v4](https://tailwindcss.com/) - Styling
-- [Supabase](https://supabase.com/) - Backend as a Service (Database, Auth)
+- [SQLite](https://www.sqlite.org/) - Embedded database (via better-sqlite3)
 
 ## 📜 Available Scripts
 
@@ -134,21 +119,24 @@ src/
 ## 🗄️ Database
 
 ### Tables
-- **profiles** - User profiles (client/freelancer/both)
+- **users** - User accounts with profile info
+- **user_sessions** - Session management
 - **skills** - Available skills catalog
 - **freelancer_skills** - Freelancer skills junction table
 - **projects** - Job postings with milestones
+- **project_milestones** - Project milestones
 - **invoices** - Auto-numbered invoices with line items
+- **invoice_items** - Invoice line items
 - **payments** - Payment tracking with blockchain support
 - **reviews** - Project reviews and ratings
 - **notifications** - User notifications
 
 ### Features
-- Row Level Security (RLS) enabled on all tables
+- SQLite database for easy setup and portability
 - Auto-generated invoice numbers (INV-YYYYMM-XXXX)
 - Automatic timestamps (created_at, updated_at)
-- Auto-profile creation on signup
 - Payment completion auto-updates invoice status
+- Foreign key constraints for data integrity
 
 ## 💻 Service Layer Usage
 
@@ -203,18 +191,21 @@ Route groups allow you to organize routes without affecting the URL structure.
 
 ## 🔐 Security
 
-- Row Level Security (RLS) policies on all database tables
-- Session-based authentication via Supabase
+- JWT-based authentication
+- Password hashing with bcrypt
 - Role-based access control (Client/Freelancer)
 - Secure API routes with authentication checks
 - Environment variable protection
 
 ## 🚀 Deployment
 
-1. Set up Supabase project and run SQL schema
-2. Configure environment variables in your hosting platform
-3. Build the application: `npm run build`
-4. Deploy to Vercel, Netlify, or your preferred platform
+1. Configure environment variables in your hosting platform:
+   - `DATABASE_PATH` - Path to SQLite database file
+   - `JWT_SECRET` - Secret key for JWT tokens
+2. Build the application: `npm run build`
+3. Deploy to Vercel, Netlify, or your preferred platform
+
+**Note**: SQLite works well for small to medium scale applications. For high-traffic production deployments, consider migrating to PostgreSQL or another database.
 
 ## 📄 License
 

@@ -1,6 +1,6 @@
 // src/app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getDatabase, generateUUID, getCurrentTimestamp } from '@/lib/sqlite';
 import { hashPassword, generateToken, hashSessionToken, getTokenExpiration } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -32,14 +32,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
     // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
+    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
 
     if (existingUser) {
       return NextResponse.json(
@@ -52,20 +48,16 @@ export async function POST(request: NextRequest) {
     const password_hash = await hashPassword(password);
 
     // Create new user
-    const { data: newUser, error: createError } = await supabase
-      .from('users')
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore - Supabase type inference issue
-      .insert({
-        email,
-        password_hash,
-        full_name: full_name || null,
-        user_type: user_type || 'freelancer',
-      })
-      .select()
-      .single();
-
-    if (createError || !newUser) {
+    const userId = generateUUID();
+    const now = getCurrentTimestamp();
+    const userTypeValue = user_type || 'freelancer';
+    
+    try {
+      db.prepare(`
+        INSERT INTO users (id, email, password_hash, full_name, user_type, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(userId, email, password_hash, full_name || null, userTypeValue, now, now);
+    } catch (createError) {
       console.error('User creation error:', createError);
       return NextResponse.json(
         { error: 'Failed to create user' },
@@ -73,35 +65,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Type assertion for the new user
-    const typedNewUser = newUser as { id: string; email: string; full_name: string | null; user_type: 'client' | 'freelancer' | 'both' };
-
     // Generate JWT token
     const token = generateToken({
-      userId: typedNewUser.id,
-      email: typedNewUser.email,
-      userType: typedNewUser.user_type,
+      userId: userId,
+      email: email,
+      userType: userTypeValue,
     });
 
     // Store session in database
     const tokenHash = await hashSessionToken(token);
     const expiresAt = getTokenExpiration();
+    const sessionId = generateUUID();
 
-    const sessionData = {
-      user_id: typedNewUser.id,
-      token_hash: tokenHash,
-      expires_at: expiresAt.toISOString(),
-      ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
-      user_agent: request.headers.get('user-agent') || null,
-    };
-
-    const { error: sessionError} = await supabase
-      .from('user_sessions')
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore - Supabase type inference issue
-      .insert(sessionData);
-
-    if (sessionError) {
+    try {
+      db.prepare(`
+        INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, ip_address, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        sessionId,
+        userId,
+        tokenHash,
+        expiresAt.toISOString(),
+        now,
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        request.headers.get('user-agent') || null
+      );
+    } catch (sessionError) {
       console.error('Session creation error:', sessionError);
     }
 
@@ -110,10 +99,10 @@ export async function POST(request: NextRequest) {
       {
         message: 'User created successfully',
         user: {
-          id: typedNewUser.id,
-          email: typedNewUser.email,
-          full_name: typedNewUser.full_name,
-          user_type: typedNewUser.user_type,
+          id: userId,
+          email: email,
+          full_name: full_name || null,
+          user_type: userTypeValue,
         },
       },
       { status: 201 }

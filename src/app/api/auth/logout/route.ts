@@ -1,6 +1,6 @@
 // src/app/api/auth/logout/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getDatabase } from '@/lib/sqlite';
 import { verifyToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -13,14 +13,11 @@ export async function POST(request: NextRequest) {
       const payload = verifyToken(token);
       
       if (payload) {
-        const supabase = getServiceSupabase();
+        const db = getDatabase();
 
         // Delete all sessions for this user (or just the current one)
         // For now, we'll delete all sessions for simplicity
-        await supabase
-          .from('user_sessions')
-          .delete()
-          .eq('user_id', payload.userId);
+        db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(payload.userId);
       }
     }
 

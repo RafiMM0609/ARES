@@ -1,10 +1,7 @@
 // src/app/api/auth/session/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getDatabase, UserRow, UserSessionRow } from '@/lib/sqlite';
 import { verifyToken } from '@/lib/auth';
-import type { Database } from '@/lib/database.types';
-
-type UserRow = Database['public']['Tables']['users']['Row'];
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,37 +20,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ session: null });
     }
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
     // Check if session exists and is not expired
-    const { data: session, error: sessionError } = await supabase
-      .from('user_sessions')
-      .select('*')
-      .eq('user_id', payload.userId)
-      .gt('expires_at', new Date().toISOString())
-      .limit(1)
-      .single();
+    const session = db.prepare(`
+      SELECT * FROM user_sessions 
+      WHERE user_id = ? AND expires_at > datetime('now')
+      LIMIT 1
+    `).get(payload.userId) as UserSessionRow | undefined;
 
-    if (sessionError || !session) {
+    if (!session) {
       return NextResponse.json({ session: null });
     }
 
     // Get user data
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active')
-      .eq('id', payload.userId)
-      .single();
+    const user = db.prepare(`
+      SELECT id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active
+      FROM users WHERE id = ?
+    `).get(payload.userId) as Pick<UserRow, 'id' | 'email' | 'full_name' | 'user_type' | 'avatar_url' | 'bio' | 'country' | 'timezone' | 'wallet_address' | 'is_active'> | undefined;
 
-    if (userError || !user) {
+    if (!user) {
       return NextResponse.json({ session: null });
     }
 
-    // Type assertion for the user object
-    const typedUser = user as Pick<UserRow, 'id' | 'email' | 'full_name' | 'user_type' | 'avatar_url' | 'bio' | 'country' | 'timezone' | 'wallet_address' | 'is_active'>;
-
     // Check if user is active
-    if (!typedUser.is_active) {
+    if (!user.is_active) {
       return NextResponse.json({ session: null });
     }
 
@@ -61,15 +52,15 @@ export async function GET(request: NextRequest) {
       session: {
         access_token: token,
         user: {
-          id: typedUser.id,
-          email: typedUser.email,
-          full_name: typedUser.full_name,
-          user_type: typedUser.user_type,
-          avatar_url: typedUser.avatar_url,
-          bio: typedUser.bio,
-          country: typedUser.country,
-          timezone: typedUser.timezone,
-          wallet_address: typedUser.wallet_address,
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name,
+          user_type: user.user_type,
+          avatar_url: user.avatar_url,
+          bio: user.bio,
+          country: user.country,
+          timezone: user.timezone,
+          wallet_address: user.wallet_address,
         },
       },
     });

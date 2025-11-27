@@ -1,7 +1,13 @@
 // src/app/api/payments/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getDatabase, generateUUID, getCurrentTimestamp, PaymentRow, UserRow, InvoiceRow } from '@/lib/sqlite';
 import { getUserFromRequest } from '@/lib/auth';
+
+interface PaymentWithRelations extends PaymentRow {
+  payer?: Pick<UserRow, 'id' | 'full_name' | 'email'> | null;
+  payee?: Pick<UserRow, 'id' | 'full_name' | 'email'> | null;
+  invoice?: Pick<InvoiceRow, 'id' | 'invoice_number' | 'amount'> | null;
+}
 
 // Get all payments (filtered by user)
 export async function GET(request: NextRequest) {
@@ -15,29 +21,70 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
-    let query = supabase
-      .from('payments')
-      .select(`
-        *,
-        payer:users!payer_id(id, full_name, email),
-        payee:users!payee_id(id, full_name, email),
-        invoice:invoices(id, invoice_number, amount)
-      `)
-      .or(`payer_id.eq.${user.userId},payee_id.eq.${user.userId}`);
+    let query = `
+      SELECT p.*,
+        payer.id as payer_id_ref, payer.full_name as payer_full_name, payer.email as payer_email,
+        payee.id as payee_id_ref, payee.full_name as payee_full_name, payee.email as payee_email,
+        i.id as invoice_id_ref, i.invoice_number, i.amount as invoice_amount
+      FROM payments p
+      LEFT JOIN users payer ON p.payer_id = payer.id
+      LEFT JOIN users payee ON p.payee_id = payee.id
+      LEFT JOIN invoices i ON p.invoice_id = i.id
+      WHERE (p.payer_id = ? OR p.payee_id = ?)
+    `;
+    const params: string[] = [user.userId, user.userId];
 
     if (status) {
-      query = query.eq('status', status);
+      query += ' AND p.status = ?';
+      params.push(status);
     }
 
-    query = query.order('created_at', { ascending: false });
+    query += ' ORDER BY p.created_at DESC';
 
-    const { data: payments, error } = await query;
+    const rows = db.prepare(query).all(...params) as Array<PaymentRow & {
+      payer_id_ref: string;
+      payer_full_name: string | null;
+      payer_email: string;
+      payee_id_ref: string;
+      payee_full_name: string | null;
+      payee_email: string;
+      invoice_id_ref: string;
+      invoice_number: string;
+      invoice_amount: number;
+    }>;
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    const payments: PaymentWithRelations[] = rows.map(row => ({
+      id: row.id,
+      invoice_id: row.invoice_id,
+      payer_id: row.payer_id,
+      payee_id: row.payee_id,
+      amount: row.amount,
+      currency: row.currency,
+      payment_method: row.payment_method,
+      transaction_hash: row.transaction_hash,
+      status: row.status,
+      payment_date: row.payment_date,
+      notes: row.notes,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      payer: {
+        id: row.payer_id_ref,
+        full_name: row.payer_full_name,
+        email: row.payer_email,
+      },
+      payee: {
+        id: row.payee_id_ref,
+        full_name: row.payee_full_name,
+        email: row.payee_email,
+      },
+      invoice: {
+        id: row.invoice_id_ref,
+        invoice_number: row.invoice_number,
+        amount: row.invoice_amount,
+      },
+    }));
 
     return NextResponse.json({ payments });
   } catch (error) {
@@ -68,14 +115,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
     // Verify the invoice exists and user is the client
-    const { data: invoice } = await supabase
-      .from('invoices')
-      .select('client_id, freelancer_id, amount')
-      .eq('id', invoice_id)
-      .single();
+    const invoice = db.prepare(`
+      SELECT client_id, freelancer_id, amount FROM invoices WHERE id = ?
+    `).get(invoice_id) as Pick<InvoiceRow, 'client_id' | 'freelancer_id' | 'amount'> | undefined;
 
     if (!invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -87,31 +132,67 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Create payment
-    const { data: payment, error } = await supabase
-      .from('payments')
-      .insert({
-        invoice_id,
-        payer_id: user.userId,
-        payee_id,
-        amount,
-        currency: currency || 'USD',
-        payment_method: payment_method || 'wallet',
-        transaction_hash,
-        notes,
-        status: 'pending',
-      })
-      .select(`
-        *,
-        payer:users!payer_id(id, full_name, email),
-        payee:users!payee_id(id, full_name, email),
-        invoice:invoices(id, invoice_number)
-      `)
-      .single();
+    const paymentId = generateUUID();
+    const now = getCurrentTimestamp();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    // Create payment
+    db.prepare(`
+      INSERT INTO payments (id, invoice_id, payer_id, payee_id, amount, currency, payment_method, transaction_hash, notes, status, payment_date, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+    `).run(
+      paymentId,
+      invoice_id,
+      user.userId,
+      payee_id,
+      amount,
+      currency || 'USD',
+      payment_method || 'wallet',
+      transaction_hash || null,
+      notes || null,
+      now,
+      now,
+      now
+    );
+
+    // Fetch created payment with relations
+    const row = db.prepare(`
+      SELECT p.*,
+        payer.id as payer_id_ref, payer.full_name as payer_full_name, payer.email as payer_email,
+        payee.id as payee_id_ref, payee.full_name as payee_full_name, payee.email as payee_email,
+        i.id as invoice_id_ref, i.invoice_number
+      FROM payments p
+      LEFT JOIN users payer ON p.payer_id = payer.id
+      LEFT JOIN users payee ON p.payee_id = payee.id
+      LEFT JOIN invoices i ON p.invoice_id = i.id
+      WHERE p.id = ?
+    `).get(paymentId) as PaymentRow & {
+      payer_id_ref: string;
+      payer_full_name: string | null;
+      payer_email: string;
+      payee_id_ref: string;
+      payee_full_name: string | null;
+      payee_email: string;
+      invoice_id_ref: string;
+      invoice_number: string;
+    };
+
+    const payment = {
+      ...row,
+      payer: {
+        id: row.payer_id_ref,
+        full_name: row.payer_full_name,
+        email: row.payer_email,
+      },
+      payee: {
+        id: row.payee_id_ref,
+        full_name: row.payee_full_name,
+        email: row.payee_email,
+      },
+      invoice: {
+        id: row.invoice_id_ref,
+        invoice_number: row.invoice_number,
+      },
+    };
 
     return NextResponse.json({ 
       message: 'Payment created successfully',

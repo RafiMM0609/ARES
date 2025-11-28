@@ -1,16 +1,27 @@
 // src/app/api/users/skills/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, generateUUID, getCurrentTimestamp, SkillRow } from '@/lib/sqlite';
+import { prisma, generateUUID, seedInitialSkills } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
 
 // Get all available skills
 export async function GET(_request: NextRequest) {
   try {
-    const db = getDatabase();
+    // Seed initial skills if needed
+    await seedInitialSkills();
 
-    const skills = db.prepare('SELECT * FROM skills ORDER BY name').all() as SkillRow[];
+    const skills = await prisma.skill.findMany({
+      orderBy: { name: 'asc' },
+    });
 
-    return NextResponse.json({ skills });
+    // Transform to snake_case for API compatibility
+    return NextResponse.json({
+      skills: skills.map(skill => ({
+        id: skill.id,
+        name: skill.name,
+        category: skill.category,
+        created_at: skill.createdAt.toISOString(),
+      })),
+    });
   } catch (error) {
     console.error('Skills fetch error:', error);
     return NextResponse.json(
@@ -39,29 +50,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
     const skillId = generateUUID();
-    const now = getCurrentTimestamp();
 
     try {
-      db.prepare(`
-        INSERT INTO skills (id, name, category, created_at)
-        VALUES (?, ?, ?, ?)
-      `).run(skillId, name, category || null, now);
+      const skill = await prisma.skill.create({
+        data: {
+          id: skillId,
+          name,
+          category: category || null,
+        },
+      });
+
+      return NextResponse.json({
+        message: 'Skill created successfully',
+        skill: {
+          id: skill.id,
+          name: skill.name,
+          category: skill.category,
+          created_at: skill.createdAt.toISOString(),
+        },
+      }, { status: 201 });
     } catch (insertError) {
       // Check if it's a unique constraint violation
-      if ((insertError as Error).message?.includes('UNIQUE constraint failed')) {
+      if ((insertError as Error).message?.includes('Unique constraint')) {
         return NextResponse.json({ error: 'Skill already exists' }, { status: 400 });
       }
       throw insertError;
     }
-
-    const skill = db.prepare('SELECT * FROM skills WHERE id = ?').get(skillId) as SkillRow;
-
-    return NextResponse.json({ 
-      message: 'Skill created successfully',
-      skill 
-    }, { status: 201 });
   } catch (error) {
     console.error('Skill creation error:', error);
     return NextResponse.json(

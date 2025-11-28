@@ -1,24 +1,7 @@
 // src/app/api/invoices/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, generateUUID, getCurrentTimestamp, generateInvoiceNumber, InvoiceRow, UserRow, ProjectRow } from '@/lib/sqlite';
+import { prisma, generateUUID, generateInvoiceNumber } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
-
-interface InvoiceItem {
-  id: string;
-  invoice_id: string;
-  description: string;
-  quantity: number;
-  unit_price: number;
-  total: number;
-  created_at: string;
-}
-
-interface InvoiceWithRelations extends InvoiceRow {
-  client?: Pick<UserRow, 'id' | 'full_name' | 'email'> | null;
-  freelancer?: Pick<UserRow, 'id' | 'full_name' | 'email'> | null;
-  project?: Pick<ProjectRow, 'id' | 'title'> | null;
-  items?: InvoiceItem[];
-}
 
 // Get all invoices (filtered by user)
 export async function GET(request: NextRequest) {
@@ -32,78 +15,88 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
-    const db = getDatabase();
-
-    let query = `
-      SELECT i.*,
-        c.id as client_id_ref, c.full_name as client_full_name, c.email as client_email,
-        f.id as freelancer_id_ref, f.full_name as freelancer_full_name, f.email as freelancer_email,
-        p.id as project_id_ref, p.title as project_title
-      FROM invoices i
-      LEFT JOIN users c ON i.client_id = c.id
-      LEFT JOIN users f ON i.freelancer_id = f.id
-      LEFT JOIN projects p ON i.project_id = p.id
-      WHERE (i.client_id = ? OR i.freelancer_id = ?)
-    `;
-    const params: string[] = [user.userId, user.userId];
+    const whereClause: Record<string, unknown> = {
+      OR: [
+        { clientId: user.userId },
+        { freelancerId: user.userId },
+      ],
+    };
 
     if (status) {
-      query += ' AND i.status = ?';
-      params.push(status);
+      whereClause.status = status;
     }
 
-    query += ' ORDER BY i.created_at DESC';
-
-    const rows = db.prepare(query).all(...params) as Array<InvoiceRow & {
-      client_id_ref: string;
-      client_full_name: string | null;
-      client_email: string;
-      freelancer_id_ref: string;
-      freelancer_full_name: string | null;
-      freelancer_email: string;
-      project_id_ref: string | null;
-      project_title: string | null;
-    }>;
-
-    // Get items for each invoice
-    const invoices: InvoiceWithRelations[] = rows.map(row => {
-      const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(row.id) as InvoiceItem[];
-      
-      return {
-        id: row.id,
-        invoice_number: row.invoice_number,
-        project_id: row.project_id,
-        client_id: row.client_id,
-        freelancer_id: row.freelancer_id,
-        amount: row.amount,
-        currency: row.currency,
-        status: row.status,
-        issue_date: row.issue_date,
-        due_date: row.due_date,
-        paid_date: row.paid_date,
-        description: row.description,
-        notes: row.notes,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
+    const invoices = await prisma.invoice.findMany({
+      where: whereClause,
+      include: {
         client: {
-          id: row.client_id_ref,
-          full_name: row.client_full_name,
-          email: row.client_email,
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
         },
         freelancer: {
-          id: row.freelancer_id_ref,
-          full_name: row.freelancer_full_name,
-          email: row.freelancer_email,
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
         },
-        project: row.project_id_ref ? {
-          id: row.project_id_ref,
-          title: row.project_title ?? '',
-        } : null,
-        items,
-      };
+        project: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        items: true,
+      },
+      orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ invoices });
+    // Transform to snake_case for API compatibility
+    return NextResponse.json({
+      invoices: invoices.map(invoice => ({
+        id: invoice.id,
+        invoice_number: invoice.invoiceNumber,
+        project_id: invoice.projectId,
+        client_id: invoice.clientId,
+        freelancer_id: invoice.freelancerId,
+        amount: invoice.amount,
+        currency: invoice.currency,
+        status: invoice.status,
+        issue_date: invoice.issueDate.toISOString(),
+        due_date: invoice.dueDate?.toISOString() || null,
+        paid_date: invoice.paidDate?.toISOString() || null,
+        description: invoice.description,
+        notes: invoice.notes,
+        created_at: invoice.createdAt.toISOString(),
+        updated_at: invoice.updatedAt.toISOString(),
+        client: {
+          id: invoice.client.id,
+          full_name: invoice.client.fullName,
+          email: invoice.client.email,
+        },
+        freelancer: {
+          id: invoice.freelancer.id,
+          full_name: invoice.freelancer.fullName,
+          email: invoice.freelancer.email,
+        },
+        project: invoice.project ? {
+          id: invoice.project.id,
+          title: invoice.project.title,
+        } : null,
+        items: invoice.items.map(item => ({
+          id: item.id,
+          invoice_id: item.invoiceId,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total: item.total,
+          created_at: item.createdAt.toISOString(),
+        })),
+      })),
+    });
   } catch (error) {
     console.error('Invoices fetch error:', error);
     return NextResponse.json(
@@ -132,89 +125,112 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
     const invoiceId = generateUUID();
-    const invoiceNumber = generateInvoiceNumber();
-    const now = getCurrentTimestamp();
+    const invoiceNumber = await generateInvoiceNumber();
 
-    // Create invoice
-    db.prepare(`
-      INSERT INTO invoices (id, invoice_number, project_id, client_id, freelancer_id, amount, currency, due_date, description, notes, status, issue_date, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)
-    `).run(
-      invoiceId,
-      invoiceNumber,
-      project_id || null,
-      client_id,
-      user.userId,
-      amount,
-      currency || 'USD',
-      due_date || null,
-      description || null,
-      notes || null,
-      now,
-      now,
-      now
-    );
+    // Create invoice with items in a transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.invoice.create({
+        data: {
+          id: invoiceId,
+          invoiceNumber,
+          projectId: project_id || null,
+          clientId: client_id,
+          freelancerId: user.userId,
+          amount,
+          currency: currency || 'USD',
+          dueDate: due_date ? new Date(due_date) : null,
+          description: description || null,
+          notes: notes || null,
+          status: 'draft',
+        },
+      });
 
-    // Create invoice items if provided
-    if (items && items.length > 0) {
-      const insertItem = db.prepare(`
-        INSERT INTO invoice_items (id, invoice_id, description, quantity, unit_price, total, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      for (const item of items) {
-        const itemId = generateUUID();
-        const quantity = item.quantity || 1;
-        const total = quantity * item.unit_price;
-        insertItem.run(itemId, invoiceId, item.description, quantity, item.unit_price, total, now);
+      // Create invoice items if provided
+      if (items && items.length > 0) {
+        for (const item of items) {
+          const quantity = item.quantity || 1;
+          const total = quantity * item.unit_price;
+          await tx.invoiceItem.create({
+            data: {
+              id: generateUUID(),
+              invoiceId,
+              description: item.description,
+              quantity,
+              unitPrice: item.unit_price,
+              total,
+            },
+          });
+        }
       }
-    }
+    });
 
     // Fetch created invoice with relations
-    const row = db.prepare(`
-      SELECT i.*,
-        c.id as client_id_ref, c.full_name as client_full_name, c.email as client_email,
-        f.id as freelancer_id_ref, f.full_name as freelancer_full_name, f.email as freelancer_email,
-        p.id as project_id_ref, p.title as project_title
-      FROM invoices i
-      LEFT JOIN users c ON i.client_id = c.id
-      LEFT JOIN users f ON i.freelancer_id = f.id
-      LEFT JOIN projects p ON i.project_id = p.id
-      WHERE i.id = ?
-    `).get(invoiceId) as InvoiceRow & {
-      client_id_ref: string;
-      client_full_name: string | null;
-      client_email: string;
-      freelancer_id_ref: string;
-      freelancer_full_name: string | null;
-      freelancer_email: string;
-      project_id_ref: string | null;
-      project_title: string | null;
-    };
-
-    const invoice: InvoiceWithRelations = {
-      ...row,
-      client: {
-        id: row.client_id_ref,
-        full_name: row.client_full_name,
-        email: row.client_email,
+    const fullInvoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        client: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+        freelancer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        items: true,
       },
-      freelancer: {
-        id: row.freelancer_id_ref,
-        full_name: row.freelancer_full_name,
-        email: row.freelancer_email,
-      },
-      project: row.project_id_ref ? {
-        id: row.project_id_ref,
-        title: row.project_title!,
-      } : null,
-    };
+    });
 
-    return NextResponse.json({ 
+    if (!fullInvoice) {
+      return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 });
+    }
+
+    // Transform to snake_case for API compatibility
+    return NextResponse.json({
       message: 'Invoice created successfully',
-      invoice 
+      invoice: {
+        id: fullInvoice.id,
+        invoice_number: fullInvoice.invoiceNumber,
+        project_id: fullInvoice.projectId,
+        client_id: fullInvoice.clientId,
+        freelancer_id: fullInvoice.freelancerId,
+        amount: fullInvoice.amount,
+        currency: fullInvoice.currency,
+        status: fullInvoice.status,
+        issue_date: fullInvoice.issueDate.toISOString(),
+        due_date: fullInvoice.dueDate?.toISOString() || null,
+        paid_date: fullInvoice.paidDate?.toISOString() || null,
+        description: fullInvoice.description,
+        notes: fullInvoice.notes,
+        created_at: fullInvoice.createdAt.toISOString(),
+        updated_at: fullInvoice.updatedAt.toISOString(),
+        client: {
+          id: fullInvoice.client.id,
+          full_name: fullInvoice.client.fullName,
+          email: fullInvoice.client.email,
+        },
+        freelancer: {
+          id: fullInvoice.freelancer.id,
+          full_name: fullInvoice.freelancer.fullName,
+          email: fullInvoice.freelancer.email,
+        },
+        project: fullInvoice.project ? {
+          id: fullInvoice.project.id,
+          title: fullInvoice.project.title,
+        } : null,
+      },
     }, { status: 201 });
   } catch (error) {
     console.error('Invoice creation error:', error);

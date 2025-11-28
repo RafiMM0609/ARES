@@ -1,6 +1,6 @@
 // src/app/api/auth/logout/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/sqlite';
+import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -13,11 +13,11 @@ export async function POST(request: NextRequest) {
       const payload = verifyToken(token);
       
       if (payload) {
-        const db = getDatabase();
-
         // Delete all sessions for this user (or just the current one)
         // For now, we'll delete all sessions for simplicity
-        db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(payload.userId);
+        await prisma.userSession.deleteMany({
+          where: { userId: payload.userId },
+        });
       }
     }
 

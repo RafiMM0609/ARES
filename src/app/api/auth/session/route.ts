@@ -1,6 +1,6 @@
 // src/app/api/auth/session/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, UserRow, UserSessionRow } from '@/lib/sqlite';
+import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -20,31 +20,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ session: null });
     }
 
-    const db = getDatabase();
-
     // Check if session exists and is not expired
-    const session = db.prepare(`
-      SELECT * FROM user_sessions 
-      WHERE user_id = ? AND expires_at > datetime('now')
-      LIMIT 1
-    `).get(payload.userId) as UserSessionRow | undefined;
+    const session = await prisma.userSession.findFirst({
+      where: {
+        userId: payload.userId,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
 
     if (!session) {
       return NextResponse.json({ session: null });
     }
 
     // Get user data
-    const user = db.prepare(`
-      SELECT id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active
-      FROM users WHERE id = ?
-    `).get(payload.userId) as Pick<UserRow, 'id' | 'email' | 'full_name' | 'user_type' | 'avatar_url' | 'bio' | 'country' | 'timezone' | 'wallet_address' | 'is_active'> | undefined;
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        userType: true,
+        avatarUrl: true,
+        bio: true,
+        country: true,
+        timezone: true,
+        walletAddress: true,
+        isActive: true,
+      },
+    });
 
     if (!user) {
       return NextResponse.json({ session: null });
     }
 
     // Check if user is active
-    if (!user.is_active) {
+    if (!user.isActive) {
       return NextResponse.json({ session: null });
     }
 
@@ -54,13 +66,13 @@ export async function GET(request: NextRequest) {
         user: {
           id: user.id,
           email: user.email,
-          full_name: user.full_name,
-          user_type: user.user_type,
-          avatar_url: user.avatar_url,
+          full_name: user.fullName,
+          user_type: user.userType,
+          avatar_url: user.avatarUrl,
           bio: user.bio,
           country: user.country,
           timezone: user.timezone,
-          wallet_address: user.wallet_address,
+          wallet_address: user.walletAddress,
         },
       },
     });

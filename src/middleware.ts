@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { verifyTokenEdge } from '@/lib/auth-edge';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Get the pathname
   const { pathname } = request.nextUrl;
 
@@ -21,8 +21,8 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // Verify token
-    const payload = verifyToken(token);
+    // Verify token using Edge-compatible function
+    const payload = await verifyTokenEdge(token);
     
     // If token is invalid or expired, redirect to login
     if (!payload) {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/services';
 import { Button, FormInput, FormSelect, ErrorMessage } from '@/components/ui';
@@ -13,7 +12,6 @@ const userTypeOptions = [
 ];
 
 export default function SignupPage() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -51,7 +49,10 @@ export default function SignupPage() {
       // Redirect based on user type
       // For 'both' users, default to client dashboard
       const redirectPath = formData.user_type === 'freelancer' ? '/freelancer' : '/client';
-      router.push(redirectPath);
+      
+      // Use window.location.href for full page navigation to ensure
+      // cookies are properly included in the request to protected routes
+      window.location.href = redirectPath;
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

@@ -1,6 +1,6 @@
-# ARES Supabase Installation Guide
+# ARES Installation Guide
 
-This comprehensive guide covers setting up Supabase for the ARES freelancer platform, both for local development and production deployment.
+This comprehensive guide covers setting up ARES freelancer platform for local development and production deployment.
 
 ## Table of Contents
 
@@ -16,7 +16,6 @@ This comprehensive guide covers setting up Supabase for the ARES freelancer plat
 
 ### Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) - Required for local Supabase
 - Node.js 18.x or later
 - npm or yarn
 
@@ -29,111 +28,84 @@ npm install
 ```
 
 This installs:
-- `@supabase/supabase-js` - Supabase client library
-- `supabase` (dev) - Supabase CLI for local development
+- `better-sqlite3` - SQLite database library
+- `bcryptjs` - Password hashing
+- `jsonwebtoken` - JWT authentication
+- And other dependencies
 
-#### 2. Start Local Supabase
-
-```bash
-npm run supabase:start
-```
-
-**First time**: This will download Docker images (~2-3 GB). This is a one-time operation.
-
-The command will output:
-
-```
-Started supabase local development setup.
-
-         API URL: http://localhost:54321
-          DB URL: postgresql://postgres:postgres@localhost:54322/postgres
-      Studio URL: http://localhost:54323
-    Inbucket URL: http://localhost:54324
-        anon key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-service_role key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Keep these values** - you'll need them in the next step.
-
-#### 3. Configure Environment Variables
+#### 2. Configure Environment Variables
 
 Create `.env.local`:
 
 ```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
-The example file already contains the default local development keys, so you can use it as-is for local development.
-
-Alternatively, use the keys from step 2:
+Edit `.env.local` with your configuration:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+# SQLite Database Configuration
+DATABASE_PATH=./data/ares.db
+
+# JWT Configuration (IMPORTANT: Change in production!)
+JWT_SECRET=your-very-secure-random-secret-key-change-this-in-production
 ```
 
-#### 4. Start the Application
+#### 3. Start the Application
 
 ```bash
 npm run dev
 ```
+
+The SQLite database will be automatically created in the `data/` directory on first run.
 
 Visit `http://localhost:3000` 🎉
 
 ### What Just Happened?
 
-When you ran `supabase:start`:
+When you ran `npm run dev`:
 
-1. **Docker containers started** - PostgreSQL, PostgREST, GoTrue (auth), etc.
-2. **Migrations applied** - Created all database tables from `supabase/migrations/`
-3. **Seed data loaded** - Populated with sample skills from `supabase/seed/`
-4. **Services started**:
-   - API Server: `http://localhost:54321`
-   - Database: `postgresql://postgres:postgres@localhost:54322/postgres`
-   - Studio (UI): `http://localhost:54323`
-   - Email Testing: `http://localhost:54324`
-
-### Accessing Supabase Studio
-
-Supabase Studio is your local database admin panel:
-
-1. Open `http://localhost:54323`
-2. Browse tables, run queries, test authentication
-3. No login required for local instance
+1. **Next.js server started** - Development server on port 3000
+2. **SQLite database created** - In `data/ares.db` (auto-created on first request)
+3. **Tables created** - All database tables with proper schema
+4. **Sample data loaded** - Pre-populated skills data
 
 ### Development Workflow
 
 ```bash
-# Start your day
-npm run supabase:start
+# Start development
 npm run dev
 
-# Make database changes
-npx supabase migration new add_new_feature
+# Lint your code
+npm run lint
 
-# Edit the new migration file in supabase/migrations/
+# Build for production
+npm run build
 
-# Apply migrations
-npm run supabase:reset  # Resets DB and applies all migrations
-
-# Generate TypeScript types
-npm run supabase:types
-
-# End your day
-npm run supabase:stop
+# Start production server
+npm run start
 ```
 
 ### Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run supabase:start` | Start local Supabase |
-| `npm run supabase:stop` | Stop local Supabase |
-| `npm run supabase:status` | Check service status |
-| `npm run supabase:reset` | Reset database (destructive!) |
-| `npm run supabase:migrate` | Apply pending migrations |
-| `npm run supabase:types` | Generate TypeScript types |
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+
+### Database Management
+
+The SQLite database is stored in `data/ares.db`. To reset the database:
+
+```bash
+# Delete the database file
+rm data/ares.db
+
+# Restart the app - database will be recreated
+npm run dev
+```
 
 ---
 
@@ -141,81 +113,52 @@ npm run supabase:stop
 
 ### Prerequisites
 
-- Supabase account ([Sign up free](https://supabase.com))
-- Project deployed to hosting platform (Vercel, Netlify, etc.)
+- Hosting platform (Vercel, Netlify, or custom server)
+- Environment variable configuration capability
 
 ### Step-by-Step Setup
 
-#### 1. Create Supabase Project
-
-1. Go to [app.supabase.com](https://app.supabase.com)
-2. Click "New Project"
-3. Fill in:
-   - **Name**: ARES (or your choice)
-   - **Database Password**: Strong password (save it!)
-   - **Region**: Closest to your users
-4. Click "Create new project"
-5. Wait 2-3 minutes for provisioning
-
-#### 2. Link Local Project to Remote
-
-```bash
-# Get your project reference ID from Supabase dashboard (Settings > General)
-npx supabase link --project-ref <your-project-ref>
-```
-
-Enter your database password when prompted.
-
-#### 3. Push Migrations to Production
-
-```bash
-npx supabase db push
-```
-
-This applies all migrations from `supabase/migrations/` to your production database.
-
-#### 4. Verify in Supabase Dashboard
-
-1. Go to your project dashboard
-2. Click "Table Editor" in the sidebar
-3. You should see: profiles, skills, projects, invoices, payments, etc.
-
-#### 5. Get Production Credentials
-
-In your Supabase project dashboard:
-
-1. Go to **Settings** > **API**
-2. Copy:
-   - **Project URL**: `https://xxxxx.supabase.co`
-   - **anon public** key
-   - **service_role** key (keep secret!)
-
-#### 6. Configure Production Environment
-
-In your hosting platform (Vercel, Netlify, etc.), set environment variables:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-production-anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<your-production-service-role-key>
-```
-
-**Important**: Never commit production keys to Git!
-
-#### 7. Deploy Your Application
+#### 1. Build the Application
 
 ```bash
 npm run build
-# Deploy to your hosting platform
 ```
 
-### Seed Data in Production (Optional)
+#### 2. Configure Production Environment
 
-To add sample skills to production:
+Set these environment variables in your hosting platform:
 
-1. Go to SQL Editor in Supabase dashboard
-2. Copy contents of `supabase/seed/seed.sql`
-3. Run the query
+```env
+# SQLite Database (use absolute path in production)
+DATABASE_PATH=/path/to/your/data/ares.db
+
+# JWT Configuration (USE A STRONG, RANDOM SECRET!)
+JWT_SECRET=your-very-secure-production-secret-key-at-least-32-characters
+```
+
+**Important**: 
+- Use a strong, random JWT secret in production!
+- Never commit production secrets to Git!
+- Ensure the database path is persistent
+
+#### 3. Deploy Your Application
+
+For Vercel:
+```bash
+vercel --prod
+```
+
+For other platforms, follow their deployment documentation.
+
+#### 4. Persistent Storage
+
+**Note**: SQLite requires persistent file storage. Some serverless platforms don't support this natively. Consider:
+
+- **Vercel**: Use with caution - the filesystem is ephemeral
+- **Railway, Render, Fly.io**: Good support for persistent volumes
+- **VPS/Dedicated Server**: Full control over storage
+
+For high-traffic production deployments, consider migrating to PostgreSQL.
 
 ---
 
@@ -225,37 +168,32 @@ To add sample skills to production:
 
 | Table | Purpose | Key Features |
 |-------|---------|--------------|
-| `profiles` | User profiles | Auto-created on signup, RLS enabled |
-| `skills` | Available skills | Public readable, auth to create |
+| `users` | User accounts | Password hashing, profile info |
+| `user_sessions` | Session management | Token storage, expiration |
+| `skills` | Available skills | Pre-populated catalog |
 | `freelancer_skills` | User skills | Junction table with proficiency |
 | `projects` | Job postings | Client creates, freelancer assigned |
 | `project_milestones` | Project phases | Milestone tracking |
 | `invoices` | Billing | Auto-generated numbers (INV-YYYYMM-XXXX) |
 | `invoice_items` | Line items | Itemized billing |
-| `payments` | Payment records | Blockchain transaction support |
+| `payments` | Payment records | Transaction tracking |
 | `reviews` | Ratings | 1-5 star ratings |
 | `notifications` | User alerts | Read/unread tracking |
 
 ### Key Features
 
-✅ **Row Level Security (RLS)** - All tables secured  
+✅ **Foreign key constraints** - Data integrity  
 ✅ **Auto-timestamps** - `created_at`, `updated_at`  
-✅ **Auto-profile creation** - On user signup  
 ✅ **Invoice numbering** - Sequential, format: INV-202410-0001  
 ✅ **Cascade deletes** - Clean up related data  
 ✅ **Performance indexes** - Optimized queries  
-
-### Database Triggers
-
-1. **update_updated_at_column** - Auto-update timestamps
-2. **on_auth_user_created** - Create profile on signup
-3. **generate_invoice_number** - Sequential invoice numbers
+✅ **Password hashing** - bcrypt with salt  
 
 ---
 
 ## API Integration
 
-The `/api` directory contains all API routes that interact with Supabase:
+The `/api` directory contains all API routes that interact with SQLite:
 
 ### Authentication Routes
 
@@ -304,81 +242,67 @@ For complete API documentation, see [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
 
 ### Local Development Issues
 
-#### Docker Not Running
+#### Database Not Created
 
-**Error**: `Cannot connect to the Docker daemon`
+**Error**: `SQLITE_CANTOPEN: unable to open database file`
 
-**Solution**: Start Docker Desktop and ensure it's running
+**Solutions**:
+1. Ensure the `data/` directory exists or can be created
+2. Check file permissions
+3. Verify `DATABASE_PATH` environment variable
+
+#### Build Errors
+
+**Error**: Various TypeScript or build errors
+
+**Solutions**:
+```bash
+# Clean and reinstall
+rm -rf node_modules .next
+npm install
+npm run build
+```
 
 #### Port Already in Use
 
-**Error**: `Port 54321 is already in use`
+**Error**: `Port 3000 is already in use`
 
 **Solutions**:
-1. Stop other Supabase instances: `npm run supabase:stop`
-2. Change ports in `supabase/config.toml`
-3. Kill process using the port: `lsof -ti:54321 | xargs kill -9` (Mac/Linux)
-
-#### Migrations Failed
-
-**Error**: Migration errors during `supabase:start`
-
-**Solution**:
-```bash
-npm run supabase:stop
-npm run supabase:start
-```
-
-If still failing, check migration SQL syntax in `supabase/migrations/`
-
-#### Seed Data Not Loading
-
-**Error**: Sample skills not in database
-
-**Solution**:
-```bash
-npm run supabase:reset  # This re-runs migrations and seed
-```
+1. Use a different port: `npm run dev -- -p 3001`
+2. Kill the process using port 3000
 
 ### Production Issues
 
-#### Cannot Connect to Supabase
+#### Cannot Connect to Database
 
 **Check**:
-1. ✅ Environment variables set correctly
-2. ✅ Project URL is HTTPS (not HTTP)
-3. ✅ Keys are correct (anon key for client, service role for server)
-4. ✅ Supabase project is active (not paused)
+1. ✅ `DATABASE_PATH` is set correctly
+2. ✅ Path is accessible and writable
+3. ✅ File permissions are correct
 
-#### RLS Policy Errors
+#### JWT Authentication Errors
 
-**Error**: `Row level security policy violation`
+**Error**: Token verification failed
 
 **Common Causes**:
-1. User not authenticated
-2. Wrong user trying to access data
-3. Missing RLS policy for operation
+1. `JWT_SECRET` not set or different between environments
+2. Token expired
+3. Token corrupted
 
-**Debug**:
-- Check authentication status
-- Verify user has correct role
-- Review RLS policies in Supabase dashboard
+**Solution**: Ensure `JWT_SECRET` is the same across all deployments
 
-#### Invoice Number Generation Fails
+#### Performance Issues
 
-**Error**: `generate_invoice_number() does not exist`
-
-**Solution**: The function wasn't created. Re-run migrations:
-```bash
-npx supabase db push
-```
+For high-traffic applications:
+1. Consider migrating to PostgreSQL
+2. Enable connection pooling
+3. Add caching layer
 
 ### Getting Help
 
-1. Check [Supabase Documentation](https://supabase.com/docs)
-2. Review [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
-3. Check [Database Setup Guide](DATABASE_SETUP.md)
-4. Inspect logs in Supabase Studio > Logs
+1. Check [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
+2. Review error messages in the console
+3. Check SQLite database integrity
 
 ---
 
@@ -387,7 +311,6 @@ npx supabase db push
 ### Development Checklist
 
 - [x] Install dependencies
-- [x] Start local Supabase
 - [x] Configure environment
 - [x] Start application
 - [ ] Test authentication flow
@@ -397,10 +320,10 @@ npx supabase db push
 
 ### Production Checklist
 
-- [ ] Create Supabase project
-- [ ] Link local to remote
-- [ ] Push migrations
 - [ ] Configure production environment
+- [ ] Build application
+- [ ] Set up persistent storage
+- [ ] Deploy application
 - [ ] Test production deployment
 - [ ] Set up monitoring
 - [ ] Configure backups
@@ -409,11 +332,10 @@ npx supabase db push
 
 ## Additional Resources
 
-- **[SUPABASE_LOCAL_SETUP.md](SUPABASE_LOCAL_SETUP.md)** - Detailed local development guide
-- **[DATABASE_SETUP.md](DATABASE_SETUP.md)** - Original database setup documentation
 - **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API reference
-- **[Supabase Docs](https://supabase.com/docs)** - Official documentation
-- **[Next.js + Supabase](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs)** - Integration guide
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide
+- **[Next.js Docs](https://nextjs.org/docs)** - Framework documentation
+- **[SQLite Docs](https://www.sqlite.org/docs.html)** - Database documentation
 
 ---
 

@@ -1,7 +1,25 @@
 // src/app/api/invoices/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getDatabase, getCurrentTimestamp, InvoiceRow, UserRow, ProjectRow, PaymentRow } from '@/lib/sqlite';
 import { getUserFromRequest } from '@/lib/auth';
+
+interface InvoiceItem {
+  id: string;
+  invoice_id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  created_at: string;
+}
+
+interface InvoiceWithRelations extends InvoiceRow {
+  client?: Pick<UserRow, 'id' | 'full_name' | 'email' | 'country'> | null;
+  freelancer?: Pick<UserRow, 'id' | 'full_name' | 'email' | 'country'> | null;
+  project?: Pick<ProjectRow, 'id' | 'title'> | null;
+  items?: InvoiceItem[];
+  payments?: PaymentRow[];
+}
 
 // Get a single invoice
 export async function GET(
@@ -16,29 +34,79 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
-    const { data: invoice, error } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        client:users!client_id(id, full_name, email, country),
-        freelancer:users!freelancer_id(id, full_name, email, country),
-        project:projects(id, title),
-        items:invoice_items(*),
-        payments:payments(*)
-      `)
-      .eq('id', id)
-      .single();
+    const row = db.prepare(`
+      SELECT i.*,
+        c.id as client_id_ref, c.full_name as client_full_name, c.email as client_email, c.country as client_country,
+        f.id as freelancer_id_ref, f.full_name as freelancer_full_name, f.email as freelancer_email, f.country as freelancer_country,
+        p.id as project_id_ref, p.title as project_title
+      FROM invoices i
+      LEFT JOIN users c ON i.client_id = c.id
+      LEFT JOIN users f ON i.freelancer_id = f.id
+      LEFT JOIN projects p ON i.project_id = p.id
+      WHERE i.id = ?
+    `).get(id) as (InvoiceRow & {
+      client_id_ref: string;
+      client_full_name: string | null;
+      client_email: string;
+      client_country: string | null;
+      freelancer_id_ref: string;
+      freelancer_full_name: string | null;
+      freelancer_email: string;
+      freelancer_country: string | null;
+      project_id_ref: string | null;
+      project_title: string | null;
+    }) | undefined;
 
-    if (error || !invoice) {
-      return NextResponse.json({ error: error?.message || 'Invoice not found' }, { status: 400 });
+    if (!row) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
     // Check if user has access to this invoice
-    if (invoice.client_id !== user.userId && invoice.freelancer_id !== user.userId) {
+    if (row.client_id !== user.userId && row.freelancer_id !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
+
+    // Get items and payments
+    const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(id) as InvoiceItem[];
+    const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ?').all(id) as PaymentRow[];
+
+    const invoice: InvoiceWithRelations = {
+      id: row.id,
+      invoice_number: row.invoice_number,
+      project_id: row.project_id,
+      client_id: row.client_id,
+      freelancer_id: row.freelancer_id,
+      amount: row.amount,
+      currency: row.currency,
+      status: row.status,
+      issue_date: row.issue_date,
+      due_date: row.due_date,
+      paid_date: row.paid_date,
+      description: row.description,
+      notes: row.notes,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      client: {
+        id: row.client_id_ref,
+        full_name: row.client_full_name,
+        email: row.client_email,
+        country: row.client_country,
+      },
+      freelancer: {
+        id: row.freelancer_id_ref,
+        full_name: row.freelancer_full_name,
+        email: row.freelancer_email,
+        country: row.freelancer_country,
+      },
+      project: row.project_id_ref ? {
+        id: row.project_id_ref,
+        title: row.project_title!,
+      } : null,
+      items,
+      payments,
+    };
 
     return NextResponse.json({ invoice });
   } catch (error) {
@@ -66,14 +134,12 @@ export async function PUT(
     const body = await request.json();
     const { status, amount, due_date, description, notes } = body;
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
     // Check if user has permission to update
-    const { data: existingInvoice } = await supabase
-      .from('invoices')
-      .select('freelancer_id, client_id, status')
-      .eq('id', id)
-      .single();
+    const existingInvoice = db.prepare(`
+      SELECT freelancer_id, client_id, status FROM invoices WHERE id = ?
+    `).get(id) as Pick<InvoiceRow, 'freelancer_id' | 'client_id' | 'status'> | undefined;
 
     if (!existingInvoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -86,59 +152,65 @@ export async function PUT(
       }, { status: 403 });
     }
 
+    const now = getCurrentTimestamp();
+
     // Client can update status (e.g., mark as paid)
     if (existingInvoice.client_id === user.userId) {
-      const { data: invoice, error } = await supabase
-        .from('invoices')
-        .update({ status })
-        .eq('id', id)
-        .select(`
-          *,
-          client:users!client_id(id, full_name, email),
-          freelancer:users!freelancer_id(id, full_name, email)
-        `)
-        .single();
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
-
-      return NextResponse.json({ 
-        message: 'Invoice updated successfully',
-        invoice 
-      });
+      db.prepare(`
+        UPDATE invoices SET status = ?, updated_at = ? WHERE id = ?
+      `).run(status, now, id);
+    } else if (existingInvoice.freelancer_id === user.userId) {
+      // Freelancer updates invoice details
+      db.prepare(`
+        UPDATE invoices SET
+          amount = COALESCE(?, amount),
+          due_date = COALESCE(?, due_date),
+          description = COALESCE(?, description),
+          notes = COALESCE(?, notes),
+          status = COALESCE(?, status),
+          updated_at = ?
+        WHERE id = ?
+      `).run(amount, due_date, description, notes, status, now, id);
+    } else {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Freelancer updates invoice details
-    if (existingInvoice.freelancer_id === user.userId) {
-      const { data: invoice, error } = await supabase
-        .from('invoices')
-        .update({
-          amount,
-          due_date,
-          description,
-          notes,
-          status,
-        })
-        .eq('id', id)
-        .select(`
-          *,
-          client:users!client_id(id, full_name, email),
-          freelancer:users!freelancer_id(id, full_name, email)
-        `)
-        .single();
+    // Fetch updated invoice
+    const row = db.prepare(`
+      SELECT i.*,
+        c.id as client_id_ref, c.full_name as client_full_name, c.email as client_email,
+        f.id as freelancer_id_ref, f.full_name as freelancer_full_name, f.email as freelancer_email
+      FROM invoices i
+      LEFT JOIN users c ON i.client_id = c.id
+      LEFT JOIN users f ON i.freelancer_id = f.id
+      WHERE i.id = ?
+    `).get(id) as InvoiceRow & {
+      client_id_ref: string;
+      client_full_name: string | null;
+      client_email: string;
+      freelancer_id_ref: string;
+      freelancer_full_name: string | null;
+      freelancer_email: string;
+    };
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
+    const invoice = {
+      ...row,
+      client: {
+        id: row.client_id_ref,
+        full_name: row.client_full_name,
+        email: row.client_email,
+      },
+      freelancer: {
+        id: row.freelancer_id_ref,
+        full_name: row.freelancer_full_name,
+        email: row.freelancer_email,
+      },
+    };
 
-      return NextResponse.json({ 
-        message: 'Invoice updated successfully',
-        invoice 
-      });
-    }
-
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    return NextResponse.json({ 
+      message: 'Invoice updated successfully',
+      invoice 
+    });
   } catch (error) {
     console.error('Invoice update error:', error);
     return NextResponse.json(
@@ -161,14 +233,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
     // Check if user is the freelancer who created the invoice
-    const { data: existingInvoice } = await supabase
-      .from('invoices')
-      .select('freelancer_id, status')
-      .eq('id', id)
-      .single();
+    const existingInvoice = db.prepare(`
+      SELECT freelancer_id, status FROM invoices WHERE id = ?
+    `).get(id) as Pick<InvoiceRow, 'freelancer_id' | 'status'> | undefined;
 
     if (!existingInvoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -185,14 +255,7 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    const { error } = await supabase
-      .from('invoices')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    db.prepare('DELETE FROM invoices WHERE id = ?').run(id);
 
     return NextResponse.json({ message: 'Invoice deleted successfully' });
   } catch (error) {

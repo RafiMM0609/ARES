@@ -1,21 +1,14 @@
 // src/app/api/users/skills/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getDatabase, generateUUID, getCurrentTimestamp, SkillRow } from '@/lib/sqlite';
 import { getUserFromRequest } from '@/lib/auth';
 
 // Get all available skills
 export async function GET(_request: NextRequest) {
   try {
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
 
-    const { data: skills, error } = await supabase
-      .from('skills')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    const skills = db.prepare('SELECT * FROM skills ORDER BY name').all() as SkillRow[];
 
     return NextResponse.json({ skills });
   } catch (error) {
@@ -46,17 +39,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getServiceSupabase();
+    const db = getDatabase();
+    const skillId = generateUUID();
+    const now = getCurrentTimestamp();
 
-    const { data: skill, error } = await supabase
-      .from('skills')
-      .insert({ name, category })
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    try {
+      db.prepare(`
+        INSERT INTO skills (id, name, category, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(skillId, name, category || null, now);
+    } catch (insertError) {
+      // Check if it's a unique constraint violation
+      if ((insertError as Error).message?.includes('UNIQUE constraint failed')) {
+        return NextResponse.json({ error: 'Skill already exists' }, { status: 400 });
+      }
+      throw insertError;
     }
+
+    const skill = db.prepare('SELECT * FROM skills WHERE id = ?').get(skillId) as SkillRow;
 
     return NextResponse.json({ 
       message: 'Skill created successfully',

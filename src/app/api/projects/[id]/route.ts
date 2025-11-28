@@ -1,26 +1,7 @@
 // src/app/api/projects/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, getCurrentTimestamp, ProjectRow, UserRow } from '@/lib/sqlite';
+import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
-
-interface ProjectMilestone {
-  id: string;
-  project_id: string;
-  title: string;
-  description: string | null;
-  amount: number;
-  status: string;
-  due_date: string | null;
-  completed_date: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface ProjectWithRelations extends ProjectRow {
-  client?: Pick<UserRow, 'id' | 'full_name' | 'email' | 'avatar_url'> | null;
-  freelancer?: Pick<UserRow, 'id' | 'full_name' | 'email' | 'avatar_url'> | null;
-  milestones?: ProjectMilestone[];
-}
 
 // Get a single project
 export async function GET(
@@ -35,71 +16,82 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const db = getDatabase();
+    const project = await prisma.project.findUnique({
+      where: { id },
+      include: {
+        client: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        freelancer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        milestones: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
 
-    const row = db.prepare(`
-      SELECT p.*,
-        c.id as client_id_ref, c.full_name as client_full_name, c.email as client_email, c.avatar_url as client_avatar_url,
-        f.id as freelancer_id_ref, f.full_name as freelancer_full_name, f.email as freelancer_email, f.avatar_url as freelancer_avatar_url
-      FROM projects p
-      LEFT JOIN users c ON p.client_id = c.id
-      LEFT JOIN users f ON p.freelancer_id = f.id
-      WHERE p.id = ?
-    `).get(id) as (ProjectRow & {
-      client_id_ref: string;
-      client_full_name: string | null;
-      client_email: string;
-      client_avatar_url: string | null;
-      freelancer_id_ref: string | null;
-      freelancer_full_name: string | null;
-      freelancer_email: string | null;
-      freelancer_avatar_url: string | null;
-    }) | undefined;
-
-    if (!row) {
+    if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
     // Check if user has access to this project
-    if (row.client_id !== user.userId && row.freelancer_id !== user.userId && row.status !== 'open') {
+    if (project.clientId !== user.userId && project.freelancerId !== user.userId && project.status !== 'open') {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Get milestones
-    const milestones = db.prepare(`
-      SELECT * FROM project_milestones WHERE project_id = ? ORDER BY created_at
-    `).all(id) as ProjectMilestone[];
-
-    const project: ProjectWithRelations = {
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      client_id: row.client_id,
-      freelancer_id: row.freelancer_id,
-      budget_amount: row.budget_amount,
-      budget_currency: row.budget_currency,
-      status: row.status,
-      deadline: row.deadline,
-      start_date: row.start_date,
-      completion_date: row.completion_date,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      client: row.client_id_ref ? {
-        id: row.client_id_ref,
-        full_name: row.client_full_name,
-        email: row.client_email,
-        avatar_url: row.client_avatar_url,
-      } : null,
-      freelancer: row.freelancer_id_ref ? {
-        id: row.freelancer_id_ref,
-        full_name: row.freelancer_full_name,
-        email: row.freelancer_email ?? '',
-        avatar_url: row.freelancer_avatar_url,
-      } : null,
-      milestones,
-    };
-
-    return NextResponse.json({ project });
+    // Transform to snake_case for API compatibility
+    return NextResponse.json({
+      project: {
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        client_id: project.clientId,
+        freelancer_id: project.freelancerId,
+        budget_amount: project.budgetAmount,
+        budget_currency: project.budgetCurrency,
+        status: project.status,
+        deadline: project.deadline?.toISOString() || null,
+        start_date: project.startDate?.toISOString() || null,
+        completion_date: project.completionDate?.toISOString() || null,
+        created_at: project.createdAt.toISOString(),
+        updated_at: project.updatedAt.toISOString(),
+        client: project.client ? {
+          id: project.client.id,
+          full_name: project.client.fullName,
+          email: project.client.email,
+          avatar_url: project.client.avatarUrl,
+        } : null,
+        freelancer: project.freelancer ? {
+          id: project.freelancer.id,
+          full_name: project.freelancer.fullName,
+          email: project.freelancer.email,
+          avatar_url: project.freelancer.avatarUrl,
+        } : null,
+        milestones: project.milestones.map(m => ({
+          id: m.id,
+          project_id: m.projectId,
+          title: m.title,
+          description: m.description,
+          amount: m.amount,
+          status: m.status,
+          due_date: m.dueDate?.toISOString() || null,
+          completed_date: m.completedDate?.toISOString() || null,
+          created_at: m.createdAt.toISOString(),
+          updated_at: m.updatedAt.toISOString(),
+        })),
+      },
+    });
   } catch (error) {
     console.error('Project fetch error:', error);
     return NextResponse.json(
@@ -125,70 +117,78 @@ export async function PUT(
     const body = await request.json();
     const { title, description, budget_amount, budget_currency, deadline, status, freelancer_id } = body;
 
-    const db = getDatabase();
-
     // First check if user has permission to update this project
-    const existingProject = db.prepare('SELECT client_id, freelancer_id FROM projects WHERE id = ?').get(id) as Pick<ProjectRow, 'client_id' | 'freelancer_id'> | undefined;
+    const existingProject = await prisma.project.findUnique({
+      where: { id },
+      select: { clientId: true, freelancerId: true },
+    });
 
     if (!existingProject) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
     // Only client can update project details
-    if (existingProject.client_id !== user.userId) {
+    if (existingProject.clientId !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    const now = getCurrentTimestamp();
+    const updatedProject = await prisma.project.update({
+      where: { id },
+      data: {
+        title: title !== undefined ? title : undefined,
+        description: description !== undefined ? description : undefined,
+        budgetAmount: budget_amount !== undefined ? budget_amount : undefined,
+        budgetCurrency: budget_currency !== undefined ? budget_currency : undefined,
+        deadline: deadline !== undefined ? (deadline ? new Date(deadline) : null) : undefined,
+        status: status !== undefined ? status : undefined,
+        freelancerId: freelancer_id !== undefined ? freelancer_id : undefined,
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+        freelancer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+    });
 
-    db.prepare(`
-      UPDATE projects SET
-        title = COALESCE(?, title),
-        description = COALESCE(?, description),
-        budget_amount = COALESCE(?, budget_amount),
-        budget_currency = COALESCE(?, budget_currency),
-        deadline = COALESCE(?, deadline),
-        status = COALESCE(?, status),
-        freelancer_id = COALESCE(?, freelancer_id),
-        updated_at = ?
-      WHERE id = ?
-    `).run(title, description, budget_amount, budget_currency, deadline, status, freelancer_id, now, id);
-
-    // Fetch updated project
-    const row = db.prepare(`
-      SELECT p.*,
-        c.id as client_id_ref, c.full_name as client_full_name, c.email as client_email,
-        f.id as freelancer_id_ref, f.full_name as freelancer_full_name, f.email as freelancer_email
-      FROM projects p
-      LEFT JOIN users c ON p.client_id = c.id
-      LEFT JOIN users f ON p.freelancer_id = f.id
-      WHERE p.id = ?
-    `).get(id) as ProjectRow & {
-      client_id_ref: string;
-      client_full_name: string | null;
-      client_email: string;
-      freelancer_id_ref: string | null;
-      freelancer_full_name: string | null;
-      freelancer_email: string | null;
-    };
-
-    const project = {
-      ...row,
-      client: row.client_id_ref ? {
-        id: row.client_id_ref,
-        full_name: row.client_full_name,
-        email: row.client_email,
-      } : null,
-      freelancer: row.freelancer_id_ref ? {
-        id: row.freelancer_id_ref,
-        full_name: row.freelancer_full_name,
-        email: row.freelancer_email,
-      } : null,
-    };
-
-    return NextResponse.json({ 
+    // Transform to snake_case for API compatibility
+    return NextResponse.json({
       message: 'Project updated successfully',
-      project 
+      project: {
+        id: updatedProject.id,
+        title: updatedProject.title,
+        description: updatedProject.description,
+        client_id: updatedProject.clientId,
+        freelancer_id: updatedProject.freelancerId,
+        budget_amount: updatedProject.budgetAmount,
+        budget_currency: updatedProject.budgetCurrency,
+        status: updatedProject.status,
+        deadline: updatedProject.deadline?.toISOString() || null,
+        start_date: updatedProject.startDate?.toISOString() || null,
+        completion_date: updatedProject.completionDate?.toISOString() || null,
+        created_at: updatedProject.createdAt.toISOString(),
+        updated_at: updatedProject.updatedAt.toISOString(),
+        client: updatedProject.client ? {
+          id: updatedProject.client.id,
+          full_name: updatedProject.client.fullName,
+          email: updatedProject.client.email,
+        } : null,
+        freelancer: updatedProject.freelancer ? {
+          id: updatedProject.freelancer.id,
+          full_name: updatedProject.freelancer.fullName,
+          email: updatedProject.freelancer.email,
+        } : null,
+      },
     });
   } catch (error) {
     console.error('Project update error:', error);
@@ -212,20 +212,23 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const db = getDatabase();
-
     // Check if user is the client who created the project
-    const existingProject = db.prepare('SELECT client_id FROM projects WHERE id = ?').get(id) as Pick<ProjectRow, 'client_id'> | undefined;
+    const existingProject = await prisma.project.findUnique({
+      where: { id },
+      select: { clientId: true },
+    });
 
     if (!existingProject) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    if (existingProject.client_id !== user.userId) {
+    if (existingProject.clientId !== user.userId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    await prisma.project.delete({
+      where: { id },
+    });
 
     return NextResponse.json({ message: 'Project deleted successfully' });
   } catch (error) {

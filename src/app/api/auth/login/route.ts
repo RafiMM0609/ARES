@@ -1,6 +1,6 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, generateUUID, getCurrentTimestamp, UserRow } from '@/lib/sqlite';
+import { prisma, generateUUID } from '@/lib/prisma';
 import { verifyPassword, generateToken, hashSessionToken, getTokenExpiration } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -15,13 +15,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
-
     // Find user by email
-    const user = db.prepare(`
-      SELECT id, email, password_hash, full_name, user_type, avatar_url, is_active
-      FROM users WHERE email = ?
-    `).get(email) as Pick<UserRow, 'id' | 'email' | 'password_hash' | 'full_name' | 'user_type' | 'avatar_url' | 'is_active'> | undefined;
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        fullName: true,
+        userType: true,
+        avatarUrl: true,
+        isActive: true,
+      },
+    });
 
     if (!user) {
       return NextResponse.json(
@@ -31,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is active
-    if (!user.is_active) {
+    if (!user.isActive) {
       return NextResponse.json(
         { error: 'Account is disabled. Please contact support.' },
         { status: 403 }
@@ -39,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
-    const isPasswordValid = await verifyPassword(password, user.password_hash);
+    const isPasswordValid = await verifyPassword(password, user.passwordHash);
 
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -49,14 +55,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Update last login time
-    const now = getCurrentTimestamp();
-    db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, user.id);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     // Generate JWT token
     const token = generateToken({
       userId: user.id,
       email: user.email,
-      userType: user.user_type,
+      userType: user.userType,
     });
 
     // Store session in database
@@ -65,18 +73,16 @@ export async function POST(request: NextRequest) {
     const sessionId = generateUUID();
 
     try {
-      db.prepare(`
-        INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, ip_address, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        sessionId,
-        user.id,
-        tokenHash,
-        expiresAt.toISOString(),
-        now,
-        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
-        request.headers.get('user-agent') || null
-      );
+      await prisma.userSession.create({
+        data: {
+          id: sessionId,
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+          userAgent: request.headers.get('user-agent') || null,
+        },
+      });
     } catch (sessionError) {
       console.error('Session creation error:', sessionError);
     }
@@ -87,9 +93,9 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        full_name: user.full_name,
-        user_type: user.user_type,
-        avatar_url: user.avatar_url,
+        full_name: user.fullName,
+        user_type: user.userType,
+        avatar_url: user.avatarUrl,
       },
     });
 

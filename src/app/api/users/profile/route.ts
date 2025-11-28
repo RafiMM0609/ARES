@@ -1,6 +1,6 @@
 // src/app/api/users/profile/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, getCurrentTimestamp, UserRow } from '@/lib/sqlite';
+import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -19,18 +19,47 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const db = getDatabase();
-
-    const profile = db.prepare(`
-      SELECT id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active, email_verified, created_at, updated_at
-      FROM users WHERE id = ?
-    `).get(payload.userId) as Omit<UserRow, 'password_hash'> | undefined;
+    const profile = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        userType: true,
+        avatarUrl: true,
+        bio: true,
+        country: true,
+        timezone: true,
+        walletAddress: true,
+        isActive: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     if (!profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ profile });
+    // Transform to snake_case for API compatibility
+    return NextResponse.json({
+      profile: {
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.fullName,
+        user_type: profile.userType,
+        avatar_url: profile.avatarUrl,
+        bio: profile.bio,
+        country: profile.country,
+        timezone: profile.timezone,
+        wallet_address: profile.walletAddress,
+        is_active: profile.isActive,
+        email_verified: profile.emailVerified,
+        created_at: profile.createdAt.toISOString(),
+        updated_at: profile.updatedAt.toISOString(),
+      },
+    });
   } catch (error) {
     console.error('Profile fetch error:', error);
     return NextResponse.json(
@@ -59,34 +88,52 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { full_name, bio, country, timezone, wallet_address, avatar_url, user_type } = body;
 
-    const db = getDatabase();
-    const now = getCurrentTimestamp();
+    const updatedProfile = await prisma.user.update({
+      where: { id: payload.userId },
+      data: {
+        fullName: full_name !== undefined ? full_name : undefined,
+        bio: bio !== undefined ? bio : undefined,
+        country: country !== undefined ? country : undefined,
+        timezone: timezone !== undefined ? timezone : undefined,
+        walletAddress: wallet_address !== undefined ? wallet_address : undefined,
+        avatarUrl: avatar_url !== undefined ? avatar_url : undefined,
+        userType: user_type !== undefined ? user_type : undefined,
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        userType: true,
+        avatarUrl: true,
+        bio: true,
+        country: true,
+        timezone: true,
+        walletAddress: true,
+        isActive: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-    db.prepare(`
-      UPDATE users SET
-        full_name = COALESCE(?, full_name),
-        bio = COALESCE(?, bio),
-        country = COALESCE(?, country),
-        timezone = COALESCE(?, timezone),
-        wallet_address = COALESCE(?, wallet_address),
-        avatar_url = COALESCE(?, avatar_url),
-        user_type = COALESCE(?, user_type),
-        updated_at = ?
-      WHERE id = ?
-    `).run(full_name, bio, country, timezone, wallet_address, avatar_url, user_type, now, payload.userId);
-
-    const profile = db.prepare(`
-      SELECT id, email, full_name, user_type, avatar_url, bio, country, timezone, wallet_address, is_active, email_verified, created_at, updated_at
-      FROM users WHERE id = ?
-    `).get(payload.userId) as Omit<UserRow, 'password_hash'> | undefined;
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ 
+    // Transform to snake_case for API compatibility
+    return NextResponse.json({
       message: 'Profile updated successfully',
-      profile 
+      profile: {
+        id: updatedProfile.id,
+        email: updatedProfile.email,
+        full_name: updatedProfile.fullName,
+        user_type: updatedProfile.userType,
+        avatar_url: updatedProfile.avatarUrl,
+        bio: updatedProfile.bio,
+        country: updatedProfile.country,
+        timezone: updatedProfile.timezone,
+        wallet_address: updatedProfile.walletAddress,
+        is_active: updatedProfile.isActive,
+        email_verified: updatedProfile.emailVerified,
+        created_at: updatedProfile.createdAt.toISOString(),
+        updated_at: updatedProfile.updatedAt.toISOString(),
+      },
     });
   } catch (error) {
     console.error('Profile update error:', error);

@@ -1,7 +1,8 @@
 // src/app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, generateUUID, getCurrentTimestamp } from '@/lib/sqlite';
+import { prisma, generateUUID, seedInitialSkills } from '@/lib/prisma';
 import { hashPassword, generateToken, hashSessionToken, getTokenExpiration } from '@/lib/auth';
+import { isValidUserType } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,10 +33,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
+    // Validate user type if provided
+    const userTypeValue = user_type || 'freelancer';
+    if (!isValidUserType(userTypeValue)) {
+      return NextResponse.json(
+        { error: 'Invalid user type. Must be one of: client, freelancer, both' },
+        { status: 400 }
+      );
+    }
+
+    // Seed initial skills if needed
+    await seedInitialSkills();
 
     // Check if user already exists
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
 
     if (existingUser) {
       return NextResponse.json(
@@ -49,14 +63,18 @@ export async function POST(request: NextRequest) {
 
     // Create new user
     const userId = generateUUID();
-    const now = getCurrentTimestamp();
-    const userTypeValue = user_type || 'freelancer';
     
+    let user;
     try {
-      db.prepare(`
-        INSERT INTO users (id, email, password_hash, full_name, user_type, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(userId, email, password_hash, full_name || null, userTypeValue, now, now);
+      user = await prisma.user.create({
+        data: {
+          id: userId,
+          email,
+          passwordHash: password_hash,
+          fullName: full_name || null,
+          userType: userTypeValue,
+        },
+      });
     } catch (createError) {
       console.error('User creation error:', createError);
       return NextResponse.json(
@@ -67,9 +85,9 @@ export async function POST(request: NextRequest) {
 
     // Generate JWT token
     const token = generateToken({
-      userId: userId,
-      email: email,
-      userType: userTypeValue,
+      userId: user.id,
+      email: user.email,
+      userType: user.userType,
     });
 
     // Store session in database
@@ -78,18 +96,16 @@ export async function POST(request: NextRequest) {
     const sessionId = generateUUID();
 
     try {
-      db.prepare(`
-        INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, ip_address, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        sessionId,
-        userId,
-        tokenHash,
-        expiresAt.toISOString(),
-        now,
-        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
-        request.headers.get('user-agent') || null
-      );
+      await prisma.userSession.create({
+        data: {
+          id: sessionId,
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+          userAgent: request.headers.get('user-agent') || null,
+        },
+      });
     } catch (sessionError) {
       console.error('Session creation error:', sessionError);
     }
@@ -99,10 +115,10 @@ export async function POST(request: NextRequest) {
       {
         message: 'User created successfully',
         user: {
-          id: userId,
-          email: email,
-          full_name: full_name || null,
-          user_type: userTypeValue,
+          id: user.id,
+          email: user.email,
+          full_name: user.fullName,
+          user_type: user.userType,
         },
       },
       { status: 201 }

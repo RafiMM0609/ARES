@@ -1,0 +1,238 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  fullName       String?  @map("full_name")
+  userType       String   @default("freelancer") @map("user_type")
+  avatarUrl      String?  @map("avatar_url")
+  bio            String?
+  country        String?
+  timezone       String?
+  walletAddress  String?  @map("wallet_address")
+  isActive       Boolean  @default(true) @map("is_active")
+  emailVerified  Boolean  @default(false) @map("email_verified")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  sessions            UserSession[]
+  freelancerSkills    FreelancerSkill[]
+  clientProjects      Project[]          @relation("ClientProjects")
+  freelancerProjects  Project[]          @relation("FreelancerProjects")
+  clientInvoices      Invoice[]          @relation("ClientInvoices")
+  freelancerInvoices  Invoice[]          @relation("FreelancerInvoices")
+  payerPayments       Payment[]          @relation("PayerPayments")
+  payeePayments       Payment[]          @relation("PayeePayments")
+  reviewsGiven        Review[]           @relation("ReviewsGiven")
+  reviewsReceived     Review[]           @relation("ReviewsReceived")
+  notifications       Notification[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  tokenHash  String   @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model Skill {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  freelancerSkills FreelancerSkill[]
+
+  @@map("skills")
+}
+
+model FreelancerSkill {
+  id               String   @id @default(uuid())
+  freelancerId     String   @map("freelancer_id")
+  skillId          String   @map("skill_id")
+  proficiencyLevel String   @default("intermediate") @map("proficiency_level")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  freelancer User  @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  skill      Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([freelancerId, skillId])
+  @@map("freelancer_skills")
+}
+
+model Project {
+  id             String   @id @default(uuid())
+  title          String
+  description    String?
+  clientId       String   @map("client_id")
+  freelancerId   String?  @map("freelancer_id")
+  budgetAmount   Float?   @map("budget_amount")
+  budgetCurrency String   @default("USD") @map("budget_currency")
+  status         String   @default("draft")
+  deadline       DateTime?
+  startDate      DateTime? @map("start_date")
+  completionDate DateTime? @map("completion_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  client     User  @relation("ClientProjects", fields: [clientId], references: [id], onDelete: Cascade)
+  freelancer User? @relation("FreelancerProjects", fields: [freelancerId], references: [id], onDelete: SetNull)
+
+  milestones ProjectMilestone[]
+  invoices   Invoice[]
+  reviews    Review[]
+
+  @@index([clientId])
+  @@index([freelancerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("projects")
+}
+
+model ProjectMilestone {
+  id            String    @id @default(uuid())
+  projectId     String    @map("project_id")
+  title         String
+  description   String?
+  amount        Float
+  status        String    @default("pending")
+  dueDate       DateTime? @map("due_date")
+  completedDate DateTime? @map("completed_date")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_milestones")
+}
+
+model Invoice {
+  id            String    @id @default(uuid())
+  invoiceNumber String    @unique @map("invoice_number")
+  projectId     String?   @map("project_id")
+  clientId      String    @map("client_id")
+  freelancerId  String    @map("freelancer_id")
+  amount        Float
+  currency      String    @default("USD")
+  status        String    @default("draft")
+  issueDate     DateTime  @default(now()) @map("issue_date")
+  dueDate       DateTime? @map("due_date")
+  paidDate      DateTime? @map("paid_date")
+  description   String?
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  client     User     @relation("ClientInvoices", fields: [clientId], references: [id], onDelete: Cascade)
+  freelancer User     @relation("FreelancerInvoices", fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@index([clientId])
+  @@index([freelancerId])
+  @@index([status])
+  @@index([projectId])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String   @map("invoice_id")
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float    @map("unit_price")
+  total       Float
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  invoiceId       String   @map("invoice_id")
+  payerId         String   @map("payer_id")
+  payeeId         String   @map("payee_id")
+  amount          Float
+  currency        String   @default("USD")
+  paymentMethod   String   @default("wallet") @map("payment_method")
+  transactionHash String?  @map("transaction_hash")
+  status          String   @default("pending")
+  paymentDate     DateTime @default(now()) @map("payment_date")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  payer   User    @relation("PayerPayments", fields: [payerId], references: [id], onDelete: Cascade)
+  payee   User    @relation("PayeePayments", fields: [payeeId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([payerId])
+  @@index([payeeId])
+  @@index([status])
+  @@map("payments")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  reviewerId String   @map("reviewer_id")
+  revieweeId String   @map("reviewee_id")
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewer User    @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee User    @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, reviewerId])
+  @@map("reviews")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@map("notifications")
+}

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, generateUUID, seedInitialSkills } from '@/lib/prisma';
 import { hashPassword, generateToken, hashSessionToken, getTokenExpiration } from '@/lib/auth';
+import { isValidUserType } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,6 +33,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate user type if provided
+    const userTypeValue = user_type || 'freelancer';
+    if (!isValidUserType(userTypeValue)) {
+      return NextResponse.json(
+        { error: 'Invalid user type. Must be one of: client, freelancer, both' },
+        { status: 400 }
+      );
+    }
+
     // Seed initial skills if needed
     await seedInitialSkills();
 
@@ -53,7 +63,6 @@ export async function POST(request: NextRequest) {
 
     // Create new user
     const userId = generateUUID();
-    const userTypeValue = user_type || 'freelancer';
     
     let user;
     try {

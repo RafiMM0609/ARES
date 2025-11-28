@@ -2,6 +2,7 @@
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 
 // Database file path - can be configured via environment variable
 const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'ares.db');
@@ -34,7 +35,7 @@ if (process.env.NODE_ENV !== 'production') {
  * Generate a UUID for new records
  */
 export function generateUUID(): string {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 
 /**
@@ -45,32 +46,37 @@ export function getCurrentTimestamp(): string {
 }
 
 /**
- * Generate invoice number with proper sequence
+ * Generate invoice number with proper sequence using a transaction to prevent race conditions
  */
 export async function generateInvoiceNumber(): Promise<string> {
   const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
   
-  // Find the highest sequence number for this month
-  const lastInvoice = await prisma.invoice.findFirst({
-    where: {
-      invoiceNumber: {
-        startsWith: `INV-${yearMonth}-`,
+  // Use a transaction to prevent race conditions
+  const invoiceNumber = await prisma.$transaction(async (tx) => {
+    // Find the highest sequence number for this month
+    const lastInvoice = await tx.invoice.findFirst({
+      where: {
+        invoiceNumber: {
+          startsWith: `INV-${yearMonth}-`,
+        },
       },
-    },
-    orderBy: {
-      invoiceNumber: 'desc',
-    },
+      orderBy: {
+        invoiceNumber: 'desc',
+      },
+    });
+
+    let sequenceNum = 1;
+    if (lastInvoice) {
+      const lastSeq = parseInt(lastInvoice.invoiceNumber.slice(-4), 10);
+      if (!isNaN(lastSeq)) {
+        sequenceNum = lastSeq + 1;
+      }
+    }
+
+    return `INV-${yearMonth}-${sequenceNum.toString().padStart(4, '0')}`;
   });
 
-  let sequenceNum = 1;
-  if (lastInvoice) {
-    const lastSeq = parseInt(lastInvoice.invoiceNumber.slice(-4), 10);
-    if (!isNaN(lastSeq)) {
-      sequenceNum = lastSeq + 1;
-    }
-  }
-
-  return `INV-${yearMonth}-${sequenceNum.toString().padStart(4, '0')}`;
+  return invoiceNumber;
 }
 
 /**

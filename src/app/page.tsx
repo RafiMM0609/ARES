@@ -5,7 +5,7 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-600 to-indigo-800 text-white">
+      <section className="bg-gradient-to-br from-blue-800 to-blue-600 text-white">
         <div className="container mx-auto px-4 py-20">
           <div className="text-center max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
@@ -21,13 +21,13 @@ export default function LandingPage() {
             <div className="flex gap-4 justify-center flex-wrap mb-12">
               <Link 
                 href="/signup" 
-                className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-lg"
+                className="bg-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-lg text-gray-700"
               >
                 Mulai Sekarang →
               </Link>
               <Link 
                 href="/login" 
-                className="bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors border-2 border-white"
+                className="bg-blue-700 text-gray-100 px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors border-2 border-white"
               >
                 Masuk
               </Link>
@@ -35,17 +35,17 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-16 grid md:grid-cols-3 gap-8">
-            <div className="bg-white bg-opacity-10 p-6 rounded-lg backdrop-blur-sm">
-              <h3 className="text-xl font-semibold mb-3">🚀 Pembayaran Instan</h3>
-              <p className="text-blue-100">Terima pembayaran dengan cepat menggunakan teknologi blockchain</p>
+            <div className="bg-blue-900 bg-opacity-10 p-6 rounded-2xl backdrop-blur-sm ">
+              <h3 className="text-xl font-semibold mb-3 text-(--global-text)">🚀 Pembayaran Instan</h3>
+              <p className="text-(--global-text)">Terima pembayaran dengan cepat menggunakan teknologi blockchain</p>
             </div>
-            <div className="bg-white bg-opacity-10 p-6 rounded-lg backdrop-blur-sm">
-              <h3 className="text-xl font-semibold mb-3">💼 Manajemen Proyek</h3>
-              <p className="text-blue-100">Kelola proyek, milestone, dan invoice dalam satu platform</p>
+            <div className="bg-blue-900 bg-opacity-10 p-6 rounded-2xl backdrop-blur-sm">
+              <h3 className="text-xl font-semibold mb-3 text-(--global-text)">💼 Manajemen Proyek</h3>
+              <p className="text-(--global-text)">Kelola proyek, milestone, dan invoice dalam satu platform</p>
             </div>
-            <div className="bg-white bg-opacity-10 p-6 rounded-lg backdrop-blur-sm">
-              <h3 className="text-xl font-semibold mb-3">🔒 Aman & Terpercaya</h3>
-              <p className="text-blue-100">Semua transaksi tercatat di blockchain untuk transparansi penuh</p>
+            <div className="bg-blue-900 bg-opacity-10 p-6 rounded-2xl backdrop-blur-sm">
+              <h3 className="text-xl font-semibold mb-3 text-(--global-text)">🔒 Aman & Terpercaya</h3>
+              <p className="text-(--global-text)">Semua transaksi tercatat di blockchain untuk transparansi penuh</p>
             </div>
           </div>
         </div>
@@ -78,17 +78,17 @@ export default function LandingPage() {
             <div className="text-center">
               <div className="bg-blue-100 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">1</div>
               <h3 className="text-xl font-semibold mb-3 text-gray-900">Buat Akun</h3>
-              <p className="text-gray-600">Daftar sebagai client atau freelancer dalam hitungan menit</p>
+              <p className="text-(--global-text)">Daftar sebagai client atau freelancer dalam hitungan menit</p>
             </div>
             <div className="text-center">
               <div className="bg-blue-100 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">2</div>
               <h3 className="text-xl font-semibold mb-3 text-gray-900">Posting atau Browse Proyek</h3>
-              <p className="text-gray-600">Client posting proyek, freelancer cari pekerjaan yang sesuai</p>
+              <p className="text-(--global-text)">Client posting proyek, freelancer cari pekerjaan yang sesuai</p>
             </div>
             <div className="text-center">
               <div className="bg-blue-100 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">3</div>
               <h3 className="text-xl font-semibold mb-3 text-gray-900">Kerjakan & Terima Bayaran</h3>
-              <p className="text-gray-600">Selesaikan proyek dan terima pembayaran dengan aman</p>
+              <p className="text-(--global-text)">Selesaikan proyek dan terima pembayaran dengan aman</p>
             </div>
           </div>
         </div>

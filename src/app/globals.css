@@ -3,12 +3,16 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --global-text: #ffffff;
+  --global-text-second: #1f1f1f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --global-text: #ffffff;
+    --global-text-second: #1f1f1f;
   }
 }
 

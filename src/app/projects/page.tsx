@@ -128,7 +128,9 @@ function ProjectCard({ project }: { project: ProjectWithRelations | MockProject 
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6">
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{project.title}</h2>
+          <Link href={`/projects/${project.id}`} className="hover:text-blue-600 transition-colors">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 hover:text-blue-600">{project.title}</h2>
+          </Link>
           <p className="text-gray-600 mb-4">{project.description}</p>
         </div>
         <div className="ml-4 text-right">
@@ -165,12 +167,20 @@ function ProjectCard({ project }: { project: ProjectWithRelations | MockProject 
             <span>📅 Deadline: {new Date(project.deadline).toLocaleDateString('id-ID')}</span>
           )}
         </div>
-        <Link
-          href="/signup"
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          Apply Now
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/projects/${project.id}`}
+            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+          >
+            Lihat Detail
+          </Link>
+          <Link
+            href="/signup"
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            Apply Now
+          </Link>
+        </div>
       </div>
     </div>
   );

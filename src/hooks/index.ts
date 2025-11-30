@@ -4,4 +4,5 @@ export { useProfile } from './useProfile';
 export { useProjectForm } from './useProjectForm';
 export { useInvoiceForm } from './useInvoiceForm';
 export { useTopCategories } from './useTopCategories';
+export { useApplications } from './useApplications';
 export type { TopCategory } from './useTopCategories';

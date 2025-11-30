@@ -187,6 +187,38 @@ export interface Database {
           updated_at?: string
         }
       }
+      applications: {
+        Row: {
+          id: string
+          project_id: string
+          freelancer_id: string
+          cover_letter: string | null
+          proposed_rate: number | null
+          status: 'pending' | 'accepted' | 'rejected' | 'withdrawn'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          freelancer_id: string
+          cover_letter?: string | null
+          proposed_rate?: number | null
+          status?: 'pending' | 'accepted' | 'rejected' | 'withdrawn'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          freelancer_id?: string
+          cover_letter?: string | null
+          proposed_rate?: number | null
+          status?: 'pending' | 'accepted' | 'rejected' | 'withdrawn'
+          created_at?: string
+          updated_at?: string
+        }
+      }
       project_milestones: {
         Row: {
           id: string

@@ -8,31 +8,30 @@ export async function GET(_request: NextRequest) {
     // Seed initial skills if needed
     await seedInitialSkills();
 
-    // Get all skills and group by category
-    const skills = await prisma.skill.findMany({
+    // Use Prisma's groupBy to aggregate skill counts by category at the database level
+    const categoryCounts = await prisma.skill.groupBy({
+      by: ['category'],
       where: {
         category: {
           not: null,
         },
       },
-      select: {
+      _count: {
         category: true,
       },
+      orderBy: {
+        _count: {
+          category: 'desc',
+        },
+      },
+      take: 5,
     });
 
-    // Count skills per category
-    const categoryCount: Record<string, number> = {};
-    for (const skill of skills) {
-      if (skill.category) {
-        categoryCount[skill.category] = (categoryCount[skill.category] || 0) + 1;
-      }
-    }
-
-    // Sort by count and get top 5
-    const topCategories = Object.entries(categoryCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, count]) => ({ name, count }));
+    // Transform the result to the expected format
+    const topCategories = categoryCounts.map((item) => ({
+      name: item.category as string,
+      count: item._count.category,
+    }));
 
     return NextResponse.json({
       categories: topCategories,

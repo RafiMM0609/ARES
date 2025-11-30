@@ -11,7 +11,7 @@ export interface TopCategory {
 interface UseTopCategoriesReturn {
   categories: TopCategory[];
   loading: boolean;
-  error: string;
+  error: string | null;
   refetch: () => Promise<void>;
 }
 
@@ -22,12 +22,12 @@ interface TopCategoriesResponse {
 export function useTopCategories(): UseTopCategoriesReturn {
   const [categories, setCategories] = useState<TopCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
-      setError('');
+      setError(null);
       
       const data = await apiClient.get<TopCategoriesResponse>('/categories/top');
       setCategories(data.categories);

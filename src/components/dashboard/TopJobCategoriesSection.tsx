@@ -75,7 +75,7 @@ export function TopJobCategoriesSection() {
             {category.name}
           </h3>
           <p className="text-xs text-gray-600 mt-1">
-            {category.count} {category.count === 1 ? 'skill' : 'skills'}
+            {category.count} keahlian
           </p>
           <div className="mt-2">
             <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-xs font-bold rounded-full">

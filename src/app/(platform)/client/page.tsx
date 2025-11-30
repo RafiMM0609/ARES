@@ -8,7 +8,8 @@ import {
   DashboardHeader, 
   DashboardSection, 
   ProjectList, 
-  InvoiceTable 
+  InvoiceTable,
+  TopJobCategoriesSection
 } from '@/components/dashboard';
 
 export default function ClientDashboard() {
@@ -65,6 +66,11 @@ export default function ClientDashboard() {
           colorClass="text-green-600"
         />
       </div>
+
+      {/* Top 5 Job Categories Section */}
+      <DashboardSection title="Top 5 Kategori Pekerjaan">
+        <TopJobCategoriesSection />
+      </DashboardSection>
 
       {/* Projects Section */}
       <DashboardSection title="My Projects">

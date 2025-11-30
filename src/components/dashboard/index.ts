@@ -6,3 +6,4 @@ export { AvailableProjectCard } from './AvailableProjectCard';
 export { AvailableProjectsSection } from './AvailableProjectsSection';
 export { DashboardSection } from './DashboardSection';
 export { DashboardHeader } from './DashboardHeader';
+export { TopJobCategoriesSection } from './TopJobCategoriesSection';

@@ -6,6 +6,7 @@ export { userService } from './user.service';
 export { projectService } from './project.service';
 export { invoiceService } from './invoice.service';
 export { paymentService } from './payment.service';
+export { applicationService } from './application.service';
 
 export { ApiError } from './api-client';
 
@@ -15,3 +16,4 @@ export type { ProfileResponse, SkillsResponse } from './user.service';
 export type { ProjectWithRelations, ProjectsResponse, ProjectResponse } from './project.service';
 export type { InvoiceWithRelations, InvoicesResponse, InvoiceResponse, CreateInvoiceData } from './invoice.service';
 export type { PaymentWithRelations, PaymentsResponse, PaymentResponse } from './payment.service';
+export type { ApplicationWithRelations, ApplicationsResponse, ApplicationResponse, CreateApplicationData, UpdateApplicationData } from './application.service';

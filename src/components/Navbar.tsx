@@ -66,6 +66,14 @@ export default function Navbar() {
                 </Link>
               )}
               <Link 
+                href="/applications" 
+                className={`hover:bg-blue-700 px-3 py-2 rounded transition-colors ${
+                  pathname === '/applications' ? 'bg-blue-700' : ''
+                }`}
+              >
+                Applications
+              </Link>
+              <Link 
                 href="/settings" 
                 className={`hover:bg-blue-700 px-3 py-2 rounded transition-colors ${
                   pathname === '/settings' ? 'bg-blue-700' : ''

@@ -39,6 +39,7 @@ model User {
   reviewsGiven        Review[]           @relation("ReviewsGiven")
   reviewsReceived     Review[]           @relation("ReviewsReceived")
   notifications       Notification[]
+  applications        Application[]      @relation("FreelancerApplications")
 
   @@map("users")
 }
@@ -102,15 +103,36 @@ model Project {
   client     User  @relation("ClientProjects", fields: [clientId], references: [id], onDelete: Cascade)
   freelancer User? @relation("FreelancerProjects", fields: [freelancerId], references: [id], onDelete: SetNull)
 
-  milestones ProjectMilestone[]
-  invoices   Invoice[]
-  reviews    Review[]
+  milestones   ProjectMilestone[]
+  invoices     Invoice[]
+  reviews      Review[]
+  applications Application[]
 
   @@index([clientId])
   @@index([freelancerId])
   @@index([status])
   @@index([createdAt])
   @@map("projects")
+}
+
+model Application {
+  id           String    @id @default(uuid())
+  projectId    String    @map("project_id")
+  freelancerId String    @map("freelancer_id")
+  coverLetter  String?   @map("cover_letter")
+  proposedRate Float?    @map("proposed_rate")
+  status       String    @default("pending") // pending, accepted, rejected, withdrawn
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancer User    @relation("FreelancerApplications", fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, freelancerId])
+  @@index([projectId])
+  @@index([freelancerId])
+  @@index([status])
+  @@map("applications")
 }
 
 model ProjectMilestone {

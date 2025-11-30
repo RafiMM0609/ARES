@@ -186,8 +186,35 @@ Route groups allow you to organize routes without affecting the URL structure.
 5. ⏳ Implement client dashboard
 6. ⏳ Implement freelancer dashboard
 7. ⏳ Add middleware for route protection
-8. ⏳ Integrate wallet connections
+8. ✅ ~~Integrate wallet connections~~ (Complete - QI Network)
 9. ⏳ Add invoice and payment UI components
+
+## 💳 QI Network Wallet Integration
+
+ARES integrates with QI Network (QIE Blockchain) for crypto payments:
+
+### Features
+- **Wallet Connection**: Connect MetaMask or compatible wallets
+- **QI Network Support**: Automatic network switching and configuration
+- **Balance Display**: Real-time QIE balance display
+- **Payment Integration**: Send and receive QIE tokens
+
+### Network Configuration
+- **Chain ID**: 5656
+- **Currency**: QIE
+- **RPC URL**: https://rpc-main1.qiblockchain.online
+
+### Usage
+```typescript
+import { useWallet } from '@/hooks';
+import { WalletConnect } from '@/components/wallet';
+
+// Hook for wallet state and actions
+const { isConnected, address, balance, connect, disconnect } = useWallet();
+
+// Component for wallet connection UI
+<WalletConnect showBalance={true} showNetworkStatus={true} />
+```
 
 ## 🔐 Security
 
@@ -196,6 +223,7 @@ Route groups allow you to organize routes without affecting the URL structure.
 - Role-based access control (Client/Freelancer)
 - Secure API routes with authentication checks
 - Environment variable protection
+- Secure wallet integration with user approval
 
 ## 🚀 Deployment
 

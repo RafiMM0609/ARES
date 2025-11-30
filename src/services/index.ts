@@ -7,6 +7,7 @@ export { projectService } from './project.service';
 export { invoiceService } from './invoice.service';
 export { paymentService } from './payment.service';
 export { applicationService } from './application.service';
+export { walletService } from './wallet.service';
 
 export { ApiError } from './api-client';
 
@@ -17,3 +18,4 @@ export type { ProjectWithRelations, ProjectsResponse, ProjectResponse } from './
 export type { InvoiceWithRelations, InvoicesResponse, InvoiceResponse, CreateInvoiceData } from './invoice.service';
 export type { PaymentWithRelations, PaymentsResponse, PaymentResponse } from './payment.service';
 export type { ApplicationWithRelations, ApplicationsResponse, ApplicationResponse, CreateApplicationData, UpdateApplicationData } from './application.service';
+export type { WalletState, TransactionResult } from './wallet.service';

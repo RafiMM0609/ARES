@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useProfile } from '@/hooks';
+import { useProfile, useWallet } from '@/hooks';
 import { 
   LoadingSpinner, 
   ErrorMessage, 
@@ -12,6 +12,7 @@ import {
   FormSelect,
   FormTextarea
 } from '@/components/ui';
+import { WalletConnect } from '@/components/wallet';
 import type { Database } from '@/lib/database.types';
 
 type UserUpdate = Database['public']['Tables']['users']['Update'];
@@ -36,6 +37,7 @@ function getUserTypeHelperText(userType: string | undefined): string {
 export default function SettingsPage() {
   const router = useRouter();
   const { profile, loading, error, updateProfile, saving, saveError, saveSuccess } = useProfile();
+  const { isConnected, address } = useWallet();
   const [formData, setFormData] = useState<Partial<UserUpdate>>({});
 
   useEffect(() => {
@@ -50,6 +52,13 @@ export default function SettingsPage() {
       });
     }
   }, [profile]);
+
+  // Update wallet address when connected
+  useEffect(() => {
+    if (isConnected && address && address !== formData.wallet_address) {
+      setFormData(prev => ({ ...prev, wallet_address: address }));
+    }
+  }, [isConnected, address, formData.wallet_address]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,19 +159,39 @@ export default function SettingsPage() {
           </div>
         </SettingsSection>
 
-        {/* Wallet Information */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Information</h2>
-          <FormInput
-            id="wallet_address"
-            label="Wallet Address"
-            type="text"
-            value={formData.wallet_address || ''}
-            onChange={(e) => setFormData({ ...formData, wallet_address: e.target.value })}
-            placeholder="0x..."
-            helperText="Your crypto wallet address for receiving payments"
-          />
-        </div>
+        {/* Wallet & Payment Information */}
+        <SettingsSection title="Wallet & Payment (QI Network)">
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-blue-900">QI Network Integration</h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Connect your wallet to receive payments on the QI Network (QIE). 
+                    Your wallet address will be automatically saved when connected.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <WalletConnect />
+
+            <FormInput
+              id="wallet_address"
+              label="Wallet Address"
+              type="text"
+              value={formData.wallet_address || ''}
+              onChange={(e) => setFormData({ ...formData, wallet_address: e.target.value })}
+              placeholder="0x..."
+              helperText={isConnected ? "Connected via wallet" : "Enter manually or connect your wallet above"}
+            />
+          </div>
+        </SettingsSection>
 
         {/* Actions */}
         <div className="flex gap-4 pt-4">

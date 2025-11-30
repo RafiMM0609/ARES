@@ -10,7 +10,8 @@ import {
   ProjectList, 
   InvoiceTable,
   PaymentList,
-  AvailableProjectsSection
+  AvailableProjectsSection,
+  TopJobCategoriesSection
 } from '@/components/dashboard';
 
 export default function FreelancerDashboard() {
@@ -70,6 +71,11 @@ export default function FreelancerDashboard() {
           colorClass="text-green-600"
         />
       </div>
+
+      {/* Top 5 Job Categories Section */}
+      <DashboardSection title="Top 5 Kategori Pekerjaan">
+        <TopJobCategoriesSection />
+      </DashboardSection>
 
       {/* Available Projects Section */}
       <DashboardSection title="Available Projects">

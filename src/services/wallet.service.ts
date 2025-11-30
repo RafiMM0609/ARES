@@ -172,11 +172,15 @@ export const sendQIE = async (
     });
 
     // Wait for transaction confirmation
+    // tx.wait() can return null if transaction is dropped/replaced
     const receipt = await tx.wait();
+    
+    // Use tx.hash as fallback if receipt is null or doesn't have hash
+    const transactionHash = receipt?.hash ?? tx.hash;
     
     return {
       success: true,
-      hash: receipt?.hash || tx.hash,
+      hash: transactionHash,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Transaction failed';

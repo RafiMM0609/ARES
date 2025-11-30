@@ -1,7 +1,7 @@
 // src/hooks/useWallet.ts
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   walletService,
   WalletState,
@@ -28,6 +28,15 @@ export function useWallet(): UseWalletReturn {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use refs to track mounted state and avoid stale closures
+  const isMounted = useRef(true);
+  const stateRef = useRef(state);
+  
+  // Keep stateRef in sync with state
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Check initial connection state
   const checkConnection = useCallback(async () => {
@@ -39,8 +48,12 @@ export function useWallet(): UseWalletReturn {
       const accounts = await walletService.getConnectedAccounts();
       const chainId = await walletService.getCurrentChainId();
 
+      if (!isMounted.current) return;
+
       if (accounts.length > 0 && chainId) {
         const balance = await walletService.getBalance(accounts[0]);
+        if (!isMounted.current) return;
+        
         setState({
           isConnected: true,
           address: accounts[0],
@@ -62,13 +75,19 @@ export function useWallet(): UseWalletReturn {
     try {
       const { address, chainId } = await walletService.connect();
       
+      if (!isMounted.current) return;
+      
       // If not on QI Network, prompt to switch
       if (!isQINetwork(chainId)) {
         try {
           await walletService.switchToQINetwork();
+          if (!isMounted.current) return;
+          
           // Re-fetch chain ID after switch
           const newChainId = await walletService.getCurrentChainId();
           const balance = await walletService.getQIBalance(address);
+          if (!isMounted.current) return;
+          
           setState({
             isConnected: true,
             address,
@@ -77,8 +96,12 @@ export function useWallet(): UseWalletReturn {
             isQINetwork: newChainId ? isQINetwork(newChainId) : false,
           });
         } catch {
+          if (!isMounted.current) return;
+          
           // User declined network switch, still connect but show current network
           const balance = await walletService.getBalance(address);
+          if (!isMounted.current) return;
+          
           setState({
             isConnected: true,
             address,
@@ -90,6 +113,8 @@ export function useWallet(): UseWalletReturn {
         }
       } else {
         const balance = await walletService.getQIBalance(address);
+        if (!isMounted.current) return;
+        
         setState({
           isConnected: true,
           address,
@@ -99,10 +124,13 @@ export function useWallet(): UseWalletReturn {
         });
       }
     } catch (err) {
+      if (!isMounted.current) return;
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect wallet';
       setError(errorMessage);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -126,10 +154,15 @@ export function useWallet(): UseWalletReturn {
 
     try {
       await walletService.switchToQINetwork();
-      const chainId = await walletService.getCurrentChainId();
+      if (!isMounted.current) return;
       
-      if (state.address) {
-        const balance = await walletService.getQIBalance(state.address);
+      const chainId = await walletService.getCurrentChainId();
+      const currentAddress = stateRef.current.address;
+      
+      if (currentAddress) {
+        const balance = await walletService.getQIBalance(currentAddress);
+        if (!isMounted.current) return;
+        
         setState(prev => ({
           ...prev,
           balance,
@@ -138,79 +171,115 @@ export function useWallet(): UseWalletReturn {
         }));
       }
     } catch (err) {
+      if (!isMounted.current) return;
       const errorMessage = err instanceof Error ? err.message : 'Failed to switch network';
       setError(errorMessage);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
-  }, [state.address]);
+  }, []);
 
   // Refresh balance
   const refreshBalance = useCallback(async () => {
-    if (!state.address) return;
+    const currentState = stateRef.current;
+    if (!currentState.address) return;
 
     try {
-      const balance = state.isQINetwork
-        ? await walletService.getQIBalance(state.address)
-        : await walletService.getBalance(state.address);
+      const balance = currentState.isQINetwork
+        ? await walletService.getQIBalance(currentState.address)
+        : await walletService.getBalance(currentState.address);
       
+      if (!isMounted.current) return;
       setState(prev => ({ ...prev, balance }));
     } catch (err) {
       console.error('Failed to refresh balance:', err);
     }
-  }, [state.address, state.isQINetwork]);
+  }, []);
 
-  // Listen for account and chain changes
+  // Listen for account and chain changes - setup once on mount
   useEffect(() => {
-    if (!isWalletAvailable() || !window.ethereum) return;
+    isMounted.current = true;
+    
+    if (!isWalletAvailable() || !window.ethereum) {
+      return;
+    }
 
     const ethereum = window.ethereum;
 
     const handleAccountsChanged = async (accounts: string[]) => {
+      if (!isMounted.current) return;
+      
       if (accounts.length === 0) {
         // User disconnected
-        disconnect();
-      } else if (accounts[0] !== state.address) {
-        // Account changed
-        const balance = state.isQINetwork
-          ? await walletService.getQIBalance(accounts[0])
-          : await walletService.getBalance(accounts[0]);
-        
-        setState(prev => ({
-          ...prev,
-          address: accounts[0],
-          balance,
-        }));
+        setState({
+          isConnected: false,
+          address: null,
+          balance: null,
+          chainId: null,
+          isQINetwork: false,
+        });
+        setError(null);
+      } else {
+        const currentState = stateRef.current;
+        if (accounts[0] !== currentState.address) {
+          try {
+            // Account changed
+            const balance = currentState.isQINetwork
+              ? await walletService.getQIBalance(accounts[0])
+              : await walletService.getBalance(accounts[0]);
+            
+            if (!isMounted.current) return;
+            
+            setState(prev => ({
+              ...prev,
+              address: accounts[0],
+              balance,
+            }));
+          } catch (err) {
+            console.error('Failed to update balance after account change:', err);
+          }
+        }
       }
     };
 
     const handleChainChanged = async (chainIdHex: string) => {
+      if (!isMounted.current) return;
+      
       const chainId = parseInt(chainIdHex, 16);
       const isQI = isQINetwork(chainId);
+      const currentState = stateRef.current;
       
-      if (state.address) {
-        const balance = isQI
-          ? await walletService.getQIBalance(state.address)
-          : await walletService.getBalance(state.address);
-        
-        setState(prev => ({
-          ...prev,
-          chainId,
-          balance,
-          isQINetwork: isQI,
-        }));
-      } else {
-        setState(prev => ({
-          ...prev,
-          chainId,
-          isQINetwork: isQI,
-        }));
-      }
+      try {
+        if (currentState.address) {
+          const balance = isQI
+            ? await walletService.getQIBalance(currentState.address)
+            : await walletService.getBalance(currentState.address);
+          
+          if (!isMounted.current) return;
+          
+          setState(prev => ({
+            ...prev,
+            chainId,
+            balance,
+            isQINetwork: isQI,
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            chainId,
+            isQINetwork: isQI,
+          }));
+        }
 
-      if (!isQI && state.isConnected) {
-        setError('Please switch to QI Network for payments.');
-      } else {
-        setError(null);
+        if (!isQI && currentState.isConnected) {
+          setError('Please switch to QI Network for payments.');
+        } else {
+          setError(null);
+        }
+      } catch (err) {
+        console.error('Failed to handle chain change:', err);
       }
     };
 
@@ -221,10 +290,11 @@ export function useWallet(): UseWalletReturn {
     checkConnection();
 
     return () => {
+      isMounted.current = false;
       ethereum.removeListener('accountsChanged', handleAccountsChanged);
       ethereum.removeListener('chainChanged', handleChainChanged);
     };
-  }, [state.address, state.isConnected, state.isQINetwork, disconnect, checkConnection]);
+  }, [checkConnection]);
 
   return {
     ...state,

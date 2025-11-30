@@ -111,19 +111,17 @@ export default function ProjectDetailPage() {
       try {
         const response = await fetch(`/api/projects/public/${id}`);
         
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error('Proyek tidak ditemukan');
-          }
-          throw new Error('Gagal memuat detail proyek');
+        if (response.ok) {
+          const data = await response.json();
+          setProject(data.project);
+          setUsingMockData(false);
+        } else {
+          // API not available or project not found, use mock data for demo
+          setProject({ ...mockProject, id });
+          setUsingMockData(true);
         }
-        
-        const data = await response.json();
-        setProject(data.project);
-        setUsingMockData(false);
-      } catch (err) {
-        console.error('Failed to fetch project:', err);
-        // Use mock data if API fails
+      } catch {
+        // Network error or API unavailable, use mock data for demo
         setProject({ ...mockProject, id });
         setUsingMockData(true);
       } finally {

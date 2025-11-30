@@ -5,10 +5,15 @@ import { useAvailableProjects } from '@/hooks';
 import { AvailableProjectCard } from './AvailableProjectCard';
 import { applicationService } from '@/services';
 
+interface StatusMessage {
+  type: 'success' | 'error';
+  text: string;
+}
+
 export function AvailableProjectsSection() {
   const { projects, loading, refetch } = useAvailableProjects();
   const [applying, setApplying] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<StatusMessage | null>(null);
 
   const handleApply = async (projectId: string) => {
     try {

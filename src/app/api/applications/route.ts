@@ -206,33 +206,45 @@ export async function POST(request: NextRequest) {
 
     const applicationId = generateUUID();
 
-    const application = await prisma.application.create({
-      data: {
-        id: applicationId,
-        projectId: project_id,
-        freelancerId: user.userId,
-        coverLetter: cover_letter || null,
-        proposedRate: proposed_rate || null,
-        status: 'pending',
-      },
-      include: {
-        project: {
-          select: {
-            id: true,
-            title: true,
-            budgetAmount: true,
-            budgetCurrency: true,
+    let application;
+    try {
+      application = await prisma.application.create({
+        data: {
+          id: applicationId,
+          projectId: project_id,
+          freelancerId: user.userId,
+          coverLetter: cover_letter || null,
+          proposedRate: proposed_rate || null,
+          status: 'pending',
+        },
+        include: {
+          project: {
+            select: {
+              id: true,
+              title: true,
+              budgetAmount: true,
+              budgetCurrency: true,
+            },
+          },
+          freelancer: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
           },
         },
-        freelancer: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
-    });
+      });
+    } catch (dbError) {
+      // Handle unique constraint violation (race condition)
+      if (dbError instanceof Error && dbError.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: 'You have already applied to this project' },
+          { status: 400 }
+        );
+      }
+      throw dbError;
+    }
 
     // Transform to snake_case for API compatibility
     return NextResponse.json({

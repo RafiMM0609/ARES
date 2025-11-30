@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { LoadingSpinner, ErrorMessage, StatusBadge } from '@/components/ui';
 
 interface ProjectClient {
@@ -95,14 +96,17 @@ Kami mencari developer dengan pengalaman minimal 3 tahun dalam pengembangan web 
   ],
 };
 
-export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ProjectDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
 
   useEffect(() => {
+    if (!id) return;
+    
     const fetchProject = async () => {
       try {
         const response = await fetch(`/api/projects/public/${id}`);

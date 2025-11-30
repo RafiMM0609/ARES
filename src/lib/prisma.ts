@@ -1,30 +1,17 @@
 // src/lib/prisma.ts
 import { PrismaClient } from '@prisma/client';
-import path from 'path';
-import fs from 'fs';
 import { randomUUID } from 'crypto';
 
-// Database file path - can be configured via environment variable
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'ares.db');
-
-// Ensure the data directory exists
-const dir = path.dirname(DB_PATH);
-if (!fs.existsSync(dir)) {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-// Set the DATABASE_URL for Prisma if not already set
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = `file:${DB_PATH}`;
-}
-
-// Prisma Client singleton
+/**
+ * Prisma Client Singleton Pattern
+ * Prevents multiple instances in development (hot reload)
+ */
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 
 if (process.env.NODE_ENV !== 'production') {
@@ -111,7 +98,7 @@ export async function seedInitialSkills(): Promise<void> {
 }
 
 /**
- * Disconnect Prisma on app shutdown
+ * Gracefully disconnect Prisma on app shutdown
  */
 export async function disconnectPrisma(): Promise<void> {
   await prisma.$disconnect();

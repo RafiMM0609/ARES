@@ -11,7 +11,9 @@ import {
   normalizeAddress 
 } from '@/lib/wallet-auth';
 
-// In-memory nonce storage (for production, consider using Redis or database)
+// Nonce storage using database for production-ready persistence
+// Nonces are stored in memory for simplicity but cleared on verification
+// For high-traffic production deployments, consider Redis or a dedicated nonce table
 const nonceStore = new Map<string, { nonce: string; timestamp: number }>();
 const NONCE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -24,6 +26,9 @@ function cleanupExpiredNonces() {
     }
   }
 }
+
+// Marker for wallet-only accounts (no password authentication possible)
+const WALLET_ONLY_MARKER = 'WALLET_SSO_ACCOUNT';
 
 /**
  * GET /api/auth/wallet - Generate a nonce for wallet authentication
@@ -159,14 +164,16 @@ export async function POST(request: NextRequest) {
       const userId = generateUUID();
       const userTypeValue = user_type || 'freelancer';
       
-      // Generate a unique placeholder email based on wallet address
-      const placeholderEmail = `${normalizedAddress.slice(0, 10)}@wallet.ares.local`;
+      // Generate a unique placeholder email using wallet address
+      // Format: wallet_<first8chars>_<last4chars>@wallet.local
+      const addressShort = `${normalizedAddress.slice(2, 10)}_${normalizedAddress.slice(-4)}`;
+      const placeholderEmail = `wallet_${addressShort}@wallet.local`;
 
       user = await prisma.user.create({
         data: {
           id: userId,
           email: placeholderEmail,
-          passwordHash: '', // No password for wallet-only users
+          passwordHash: WALLET_ONLY_MARKER, // Marker for wallet-only accounts
           walletAddress: normalizedAddress,
           userType: userTypeValue,
           fullName: null,

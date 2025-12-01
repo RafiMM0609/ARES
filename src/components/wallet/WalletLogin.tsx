@@ -52,12 +52,8 @@ export function WalletLogin({
       // Step 1: Get nonce and message from server
       const { message } = await authService.getWalletNonce(address);
 
-      // Step 2: Request signature from wallet
-      if (!window.ethereum) {
-        throw new Error('Wallet not available');
-      }
-
-      const signature = await window.ethereum.request({
+      // Step 2: Request signature from wallet (wallet availability already checked via isWalletDetected)
+      const signature = await window.ethereum!.request({
         method: 'personal_sign',
         params: [message, address],
       }) as string;
@@ -75,6 +71,7 @@ export function WalletLogin({
         onSuccess(result.isNewUser);
       } else {
         // Default redirect based on user type
+        // Using window.location.href for full page reload to ensure auth cookies are properly included
         const redirectPath = result.user?.user_type === 'freelancer' ? '/freelancer' : '/client';
         window.location.href = redirectPath;
       }

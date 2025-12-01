@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma, generateUUID } from '@/lib/prisma';
 import { verifyPassword, generateToken, hashSessionToken, getTokenExpiration } from '@/lib/auth';
 
+// Marker for wallet-only accounts (must match the one in wallet/route.ts)
+const WALLET_ONLY_MARKER = 'WALLET_SSO_ACCOUNT';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -26,6 +29,7 @@ export async function POST(request: NextRequest) {
         userType: true,
         avatarUrl: true,
         isActive: true,
+        walletAddress: true,
       },
     });
 
@@ -41,6 +45,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Account is disabled. Please contact support.' },
         { status: 403 }
+      );
+    }
+
+    // Check if this is a wallet-only account
+    if (user.passwordHash === WALLET_ONLY_MARKER) {
+      return NextResponse.json(
+        { error: 'This account uses wallet login. Please use the Wallet SSO option.' },
+        { status: 401 }
       );
     }
 

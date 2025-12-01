@@ -13,6 +13,31 @@ export interface LoginData {
   password: string;
 }
 
+export interface WalletNonceResponse {
+  message: string;
+  nonce: string;
+}
+
+export interface WalletLoginData {
+  address: string;
+  signature: string;
+  message: string;
+  user_type?: 'client' | 'freelancer' | 'both';
+}
+
+export interface WalletAuthResponse {
+  message: string;
+  isNewUser: boolean;
+  user?: {
+    id: string;
+    email: string;
+    full_name: string | null;
+    user_type: string;
+    avatar_url: string | null;
+    wallet_address: string | null;
+  };
+}
+
 export interface AuthResponse {
   message: string;
   user?: {
@@ -50,5 +75,14 @@ export const authService = {
 
   getSession: async (): Promise<SessionResponse> => {
     return apiClient.get<SessionResponse>('/auth/session');
+  },
+
+  // Wallet SSO methods
+  getWalletNonce: async (address: string): Promise<WalletNonceResponse> => {
+    return apiClient.get<WalletNonceResponse>(`/auth/wallet?address=${encodeURIComponent(address)}`);
+  },
+
+  walletLogin: async (data: WalletLoginData): Promise<WalletAuthResponse> => {
+    return apiClient.post<WalletAuthResponse>('/auth/wallet', data);
   },
 };

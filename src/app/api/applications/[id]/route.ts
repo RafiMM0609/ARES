@@ -1,6 +1,6 @@
 // src/app/api/applications/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, generateUUID, generateInvoiceNumber } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
 
 // Get a single application
@@ -120,12 +120,18 @@ export async function PUT(
     const body = await request.json();
     const { status, cover_letter, proposed_rate } = body;
 
-    // Get existing application
+    // Get existing application with project budget details
     const existingApplication = await prisma.application.findUnique({
       where: { id },
       include: {
         project: {
-          select: { clientId: true, id: true },
+          select: { 
+            clientId: true, 
+            id: true,
+            title: true,
+            budgetAmount: true,
+            budgetCurrency: true,
+          },
         },
       },
     });
@@ -200,7 +206,7 @@ export async function PUT(
       },
     });
 
-    // If application is accepted, optionally assign freelancer to project
+    // If application is accepted, assign freelancer to project and auto-generate invoice
     if (status === 'accepted' && isClient) {
       await prisma.project.update({
         where: { id: existingApplication.projectId },
@@ -219,6 +225,48 @@ export async function PUT(
         },
         data: { status: 'rejected' },
       });
+
+      // Auto-generate invoice for the project
+      const project = existingApplication.project;
+      if (project && project.budgetAmount && project.budgetAmount > 0) {
+        const invoiceId = generateUUID();
+        const invoiceNumber = await generateInvoiceNumber();
+        
+        // Calculate due date (30 days from now by default)
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 30);
+
+        await prisma.$transaction(async (tx) => {
+          // Create the invoice
+          await tx.invoice.create({
+            data: {
+              id: invoiceId,
+              invoiceNumber,
+              projectId: project.id,
+              clientId: project.clientId,
+              freelancerId: existingApplication.freelancerId,
+              amount: project.budgetAmount!,
+              currency: project.budgetCurrency || 'USD',
+              dueDate,
+              description: `Invoice for project: ${project.title}`,
+              notes: 'Auto-generated invoice upon project assignment.',
+              status: 'draft',
+            },
+          });
+
+          // Create invoice item for the project
+          await tx.invoiceItem.create({
+            data: {
+              id: generateUUID(),
+              invoiceId,
+              description: `Project: ${project.title}`,
+              quantity: 1,
+              unitPrice: project.budgetAmount!,
+              total: project.budgetAmount!,
+            },
+          });
+        });
+      }
     }
 
     // Transform to snake_case for API compatibility

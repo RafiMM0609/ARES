@@ -7,6 +7,9 @@ import { walletService } from '@/services/wallet.service';
 import { authService } from '@/services/auth.service';
 import { Button } from '@/components/ui';
 
+// LocalStorage key for storing wallet connection preference (shared with useWallet hook)
+const WALLET_CONNECTED_KEY = 'ares_wallet_connected';
+
 interface WalletLoginProps {
   userType?: 'client' | 'freelancer' | 'both';
   onSuccess?: (isNewUser: boolean) => void;
@@ -66,7 +69,12 @@ export function WalletLogin({
         user_type: userType,
       });
 
-      // Step 4: Handle success
+      // Step 4: Save wallet connection preference for auto-connect after redirect
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(WALLET_CONNECTED_KEY, 'true');
+      }
+
+      // Step 5: Handle success
       if (onSuccess) {
         onSuccess(result.isNewUser);
       } else {

@@ -8,7 +8,9 @@ import {
   isWalletAvailable,
   isQINetwork,
 } from '@/services/wallet.service';
-import { log } from 'console';
+
+// LocalStorage key for storing wallet connection preference
+const WALLET_CONNECTED_KEY = 'ares_wallet_connected';
 
 interface UseWalletReturn extends WalletState {
   connect: () => Promise<void>;
@@ -18,6 +20,22 @@ interface UseWalletReturn extends WalletState {
   loading: boolean;
   error: string | null;
 }
+
+// Helper to check if wallet should auto-connect
+const shouldAutoConnect = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(WALLET_CONNECTED_KEY) === 'true';
+};
+
+// Helper to set wallet connection preference
+const setWalletConnected = (connected: boolean): void => {
+  if (typeof window === 'undefined') return;
+  if (connected) {
+    localStorage.setItem(WALLET_CONNECTED_KEY, 'true');
+  } else {
+    localStorage.removeItem(WALLET_CONNECTED_KEY);
+  }
+};
 
 export function useWallet(): UseWalletReturn {
   const [state, setState] = useState<WalletState>({
@@ -33,6 +51,7 @@ export function useWallet(): UseWalletReturn {
   // Use refs to track mounted state and avoid stale closures
   const isMounted = useRef(true);
   const stateRef = useRef(state);
+  const autoConnectAttempted = useRef(false);
   
   // Keep stateRef in sync with state
   useEffect(() => {
@@ -48,9 +67,6 @@ export function useWallet(): UseWalletReturn {
     try {
       const accounts = await walletService.getConnectedAccounts();
       const chainId = await walletService.getCurrentChainId();
-      console.log("Data accounts", accounts);
-      console.log("Data chain id", chainId);
-      
 
       if (!isMounted.current) return;
 
@@ -64,10 +80,49 @@ export function useWallet(): UseWalletReturn {
           chainId,
           isQINetwork: isQINetwork(chainId),
         });
+        // Remember that wallet is connected
+        setWalletConnected(true);
       }
     } catch (err) {
       console.error('Failed to check wallet connection:', err);
     }
+  }, []);
+
+  // Auto-connect wallet if user previously logged in with wallet
+  const autoConnect = useCallback(async () => {
+    if (!isWalletAvailable() || !window.ethereum) {
+      return false;
+    }
+
+    try {
+      // Request accounts - this will auto-approve if user already granted permission
+      const accounts = await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      }) as string[];
+
+      if (!isMounted.current) return false;
+
+      if (accounts.length > 0) {
+        const chainId = await walletService.getCurrentChainId();
+        const balance = await walletService.getBalance(accounts[0]);
+        
+        if (!isMounted.current) return false;
+        
+        setState({
+          isConnected: true,
+          address: accounts[0],
+          balance,
+          chainId: chainId || null,
+          isQINetwork: chainId ? isQINetwork(chainId) : false,
+        });
+        return true;
+      }
+    } catch (err) {
+      console.error('Auto-connect failed:', err);
+      // If auto-connect fails, clear the preference
+      setWalletConnected(false);
+    }
+    return false;
   }, []);
 
   // Connect wallet
@@ -98,6 +153,8 @@ export function useWallet(): UseWalletReturn {
             chainId: newChainId || chainId,
             isQINetwork: newChainId ? isQINetwork(newChainId) : false,
           });
+          // Remember wallet connection preference
+          setWalletConnected(true);
         } catch {
           if (!isMounted.current) return;
           
@@ -112,6 +169,8 @@ export function useWallet(): UseWalletReturn {
             chainId,
             isQINetwork: false,
           });
+          // Remember wallet connection preference
+          setWalletConnected(true);
           setError('Please switch to QI Network for full functionality.');
         }
       } else {
@@ -125,6 +184,8 @@ export function useWallet(): UseWalletReturn {
           chainId,
           isQINetwork: true,
         });
+        // Remember wallet connection preference
+        setWalletConnected(true);
       }
     } catch (err) {
       if (!isMounted.current) return;
@@ -148,6 +209,8 @@ export function useWallet(): UseWalletReturn {
       isQINetwork: false,
     });
     setError(null);
+    // Clear wallet connection preference
+    setWalletConnected(false);
   }, []);
 
   // Switch to QI Network
@@ -215,7 +278,7 @@ export function useWallet(): UseWalletReturn {
       if (!isMounted.current) return;
       
       if (accounts.length === 0) {
-        // User disconnected
+        // User disconnected from wallet extension
         setState({
           isConnected: false,
           address: null,
@@ -224,6 +287,8 @@ export function useWallet(): UseWalletReturn {
           isQINetwork: false,
         });
         setError(null);
+        // Clear wallet connection preference when user explicitly disconnects
+        setWalletConnected(false);
       } else {
         const currentState = stateRef.current;
         if (accounts[0] !== currentState.address) {
@@ -289,15 +354,26 @@ export function useWallet(): UseWalletReturn {
     ethereum.on('accountsChanged', handleAccountsChanged);
     ethereum.on('chainChanged', handleChainChanged);
 
-    // Check initial connection
-    checkConnection();
+    // Check initial connection first, then auto-connect if needed
+    const initializeConnection = async () => {
+      // First check if already connected (eth_accounts)
+      await checkConnection();
+      
+      // If not connected but user previously logged in with wallet, try to auto-connect
+      if (!stateRef.current.isConnected && shouldAutoConnect() && !autoConnectAttempted.current) {
+        autoConnectAttempted.current = true;
+        await autoConnect();
+      }
+    };
+
+    initializeConnection();
 
     return () => {
       isMounted.current = false;
       ethereum.removeListener('accountsChanged', handleAccountsChanged);
       ethereum.removeListener('chainChanged', handleChainChanged);
     };
-  }, [checkConnection]);
+  }, [checkConnection, autoConnect]);
 
   return {
     ...state,

@@ -1,6 +1,6 @@
 // src/app/api/applications/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, generateUUID, generateInvoiceNumber } from '@/lib/prisma';
+import { prisma, generateUUID } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
 
 // Get a single application
@@ -208,6 +208,9 @@ export async function PUT(
 
     // If application is accepted, assign freelancer to project and auto-generate invoice
     if (status === 'accepted' && isClient) {
+      const project = existingApplication.project;
+      const projectBudget = project?.budgetAmount ?? 0;
+      
       await prisma.project.update({
         where: { id: existingApplication.projectId },
         data: {
@@ -226,17 +229,38 @@ export async function PUT(
         data: { status: 'rejected' },
       });
 
-      // Auto-generate invoice for the project
-      const project = existingApplication.project;
-      if (project && project.budgetAmount && project.budgetAmount > 0) {
-        const invoiceId = generateUUID();
-        const invoiceNumber = await generateInvoiceNumber();
-        
+      // Auto-generate invoice for the project if budget is defined
+      if (project && projectBudget > 0) {
         // Calculate due date (30 days from now by default)
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 30);
 
+        // Use transaction to ensure invoice number generation and creation are atomic
         await prisma.$transaction(async (tx) => {
+          const invoiceId = generateUUID();
+          
+          // Generate invoice number inside transaction to prevent race conditions
+          const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
+          const lastInvoice = await tx.invoice.findFirst({
+            where: {
+              invoiceNumber: {
+                startsWith: `INV-${yearMonth}-`,
+              },
+            },
+            orderBy: {
+              invoiceNumber: 'desc',
+            },
+          });
+
+          let sequenceNum = 1;
+          if (lastInvoice) {
+            const lastSeq = parseInt(lastInvoice.invoiceNumber.slice(-4), 10);
+            if (!isNaN(lastSeq)) {
+              sequenceNum = lastSeq + 1;
+            }
+          }
+          const invoiceNumber = `INV-${yearMonth}-${sequenceNum.toString().padStart(4, '0')}`;
+          
           // Create the invoice
           await tx.invoice.create({
             data: {
@@ -245,7 +269,7 @@ export async function PUT(
               projectId: project.id,
               clientId: project.clientId,
               freelancerId: existingApplication.freelancerId,
-              amount: project.budgetAmount!,
+              amount: projectBudget,
               currency: project.budgetCurrency || 'USD',
               dueDate,
               description: `Invoice for project: ${project.title}`,
@@ -261,8 +285,8 @@ export async function PUT(
               invoiceId,
               description: `Project: ${project.title}`,
               quantity: 1,
-              unitPrice: project.budgetAmount!,
-              total: project.budgetAmount!,
+              unitPrice: projectBudget,
+              total: projectBudget,
             },
           });
         });

@@ -8,6 +8,7 @@ import {
   isWalletAvailable,
   isQINetwork,
 } from '@/services/wallet.service';
+import { log } from 'console';
 
 interface UseWalletReturn extends WalletState {
   connect: () => Promise<void>;
@@ -47,13 +48,15 @@ export function useWallet(): UseWalletReturn {
     try {
       const accounts = await walletService.getConnectedAccounts();
       const chainId = await walletService.getCurrentChainId();
+      console.log("Data accounts", accounts);
+      console.log("Data chain id", chainId);
+      
 
       if (!isMounted.current) return;
 
       if (accounts.length > 0 && chainId) {
         const balance = await walletService.getBalance(accounts[0]);
         if (!isMounted.current) return;
-        
         setState({
           isConnected: true,
           address: accounts[0],

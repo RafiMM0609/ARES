@@ -6,9 +6,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { walletService } from '@/services/wallet.service';
 import { authService } from '@/services/auth.service';
 import { Button } from '@/components/ui';
-
-// LocalStorage key for storing wallet connection preference (shared with useWallet hook)
-const WALLET_CONNECTED_KEY = 'ares_wallet_connected';
+import { WALLET_CONNECTED_KEY } from '@/lib/wallet-constants';
 
 interface WalletLoginProps {
   userType?: 'client' | 'freelancer' | 'both';

@@ -8,9 +8,7 @@ import {
   isWalletAvailable,
   isQINetwork,
 } from '@/services/wallet.service';
-
-// LocalStorage key for storing wallet connection preference
-const WALLET_CONNECTED_KEY = 'ares_wallet_connected';
+import { WALLET_CONNECTED_KEY } from '@/lib/wallet-constants';
 
 interface UseWalletReturn extends WalletState {
   connect: () => Promise<void>;
@@ -95,7 +93,9 @@ export function useWallet(): UseWalletReturn {
     }
 
     try {
-      // Request accounts - this will auto-approve if user already granted permission
+      // Request accounts - this will attempt to reconnect.
+      // If permission was previously granted and not revoked, it will auto-approve.
+      // If permission was revoked, the user may see a connection prompt.
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
       }) as string[];

@@ -97,6 +97,15 @@ export function WalletLogin({
         <p className="mt-2 text-sm text-yellow-700">
           Please install{' '}
           <a
+            href="https://www.qiewallet.me/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-yellow-900 font-medium"
+          >
+            QIE Wallet
+          </a>{' '}
+          (recommended) or{' '}
+          <a
             href="https://metamask.io/download/"
             target="_blank"
             rel="noopener noreferrer"
@@ -171,7 +180,7 @@ export function WalletLogin({
       )}
 
       <p className="text-xs text-gray-500 text-center">
-        Secure login using your QI Network wallet
+        Secure login using your QIE Wallet or compatible wallet
       </p>
     </div>
   );

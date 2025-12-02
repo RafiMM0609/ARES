@@ -35,7 +35,7 @@ export function WalletConnect({
     return walletService.isAvailable();
   }, []);
 
-  // If wallet is not available (e.g., no MetaMask)
+  // If wallet is not available (e.g., no QIE Wallet or MetaMask)
   if (!isWalletDetected) {
     return (
       <div className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 ${className}`}>
@@ -48,6 +48,15 @@ export function WalletConnect({
         <p className="mt-2 text-sm text-yellow-700">
           Please install{' '}
           <a
+            href="https://www.qiewallet.me/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-yellow-900 font-medium"
+          >
+            QIE Wallet
+          </a>{' '}
+          (recommended) or{' '}
+          <a
             href="https://metamask.io/download/"
             target="_blank"
             rel="noopener noreferrer"
@@ -55,7 +64,7 @@ export function WalletConnect({
           >
             MetaMask
           </a>{' '}
-          or a compatible wallet to connect.
+          to connect.
         </p>
       </div>
     );

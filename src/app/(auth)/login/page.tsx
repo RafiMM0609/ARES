@@ -47,10 +47,17 @@ export default function LoginPage() {
     }
   };
 
-  const handleWalletSuccess = (isNewUser: boolean) => {
-    // Redirect will be handled by WalletLogin component
-    // This callback can be used for analytics or custom behavior
-    console.log(isNewUser ? 'New user created via wallet' : 'Existing user logged in via wallet');
+  const handleWalletSuccess = async (isNewUser: boolean) => {
+    // Get user profile to determine redirect
+    const { profile } = await userService.getProfile();
+    
+    // Redirect based on user type
+    // For 'both' users, default to client dashboard
+    const redirectPath = profile.user_type === 'freelancer' ? '/freelancer' : '/client';
+    
+    // Use window.location.href for full page navigation to ensure
+    // cookies are properly included in the request to protected routes
+    window.location.href = redirectPath;
   };
 
   const handleWalletError = (walletError: string) => {

@@ -130,8 +130,14 @@ export function PaymentModal({
                   <span className="text-gray-600">Freelancer</span>
                   <span className="font-medium">{invoice.freelancer?.full_name || 'N/A'}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Invoice Amount</span>
+                  <span className="font-medium">
+                    ${invoice.amount} {invoice.currency}
+                  </span>
+                </div>
                 <div className="border-t pt-3 flex justify-between">
-                  <span className="text-gray-900 font-semibold">Total Amount</span>
+                  <span className="text-gray-900 font-semibold">Payment Amount (QIE)</span>
                   <span className="text-xl font-bold text-green-600">
                     {invoice.amount} QIE
                   </span>

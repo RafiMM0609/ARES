@@ -1,7 +1,89 @@
 // src/app/api/applications/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, generateUUID } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
+
+// Type alias for Prisma transaction client
+type TransactionClient = Prisma.TransactionClient;
+
+// Constants for invoice generation
+const DEFAULT_INVOICE_DUE_DAYS = 30;
+const INVOICE_PREFIX = 'INV';
+const DEFAULT_CURRENCY = 'USD';
+
+/**
+ * Generates a unique invoice number in format: INV-YYYYMM-XXXX
+ * Must be called within a transaction to prevent race conditions
+ */
+async function generateInvoiceNumberInTransaction(
+  tx: TransactionClient
+): Promise<string> {
+  const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
+  const prefix = `${INVOICE_PREFIX}-${yearMonth}-`;
+  
+  const lastInvoice = await tx.invoice.findFirst({
+    where: { invoiceNumber: { startsWith: prefix } },
+    orderBy: { invoiceNumber: 'desc' },
+  });
+
+  let sequenceNum = 1;
+  if (lastInvoice) {
+    const lastSeq = parseInt(lastInvoice.invoiceNumber.slice(-4), 10);
+    if (!isNaN(lastSeq)) {
+      sequenceNum = lastSeq + 1;
+    }
+  }
+  
+  return `${prefix}${sequenceNum.toString().padStart(4, '0')}`;
+}
+
+/**
+ * Creates an auto-generated invoice for a project assignment
+ */
+async function createProjectInvoice(
+  projectId: string,
+  projectTitle: string,
+  clientId: string,
+  freelancerId: string,
+  amount: number,
+  currency: string
+): Promise<void> {
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + DEFAULT_INVOICE_DUE_DAYS);
+
+  await prisma.$transaction(async (tx) => {
+    const invoiceId = generateUUID();
+    const invoiceNumber = await generateInvoiceNumberInTransaction(tx);
+    
+    await tx.invoice.create({
+      data: {
+        id: invoiceId,
+        invoiceNumber,
+        projectId,
+        clientId,
+        freelancerId,
+        amount,
+        currency: currency ?? DEFAULT_CURRENCY,
+        dueDate,
+        description: `Invoice for project: ${projectTitle}`,
+        notes: 'Auto-generated invoice upon project assignment.',
+        status: 'draft',
+      },
+    });
+
+    await tx.invoiceItem.create({
+      data: {
+        id: generateUUID(),
+        invoiceId,
+        description: `Project: ${projectTitle}`,
+        quantity: 1,
+        unitPrice: amount,
+        total: amount,
+      },
+    });
+  });
+}
 
 // Get a single application
 export async function GET(
@@ -120,12 +202,18 @@ export async function PUT(
     const body = await request.json();
     const { status, cover_letter, proposed_rate } = body;
 
-    // Get existing application
+    // Get existing application with project budget details
     const existingApplication = await prisma.application.findUnique({
       where: { id },
       include: {
         project: {
-          select: { clientId: true, id: true },
+          select: { 
+            clientId: true, 
+            id: true,
+            title: true,
+            budgetAmount: true,
+            budgetCurrency: true,
+          },
         },
       },
     });
@@ -200,8 +288,11 @@ export async function PUT(
       },
     });
 
-    // If application is accepted, optionally assign freelancer to project
+    // If application is accepted, assign freelancer to project and auto-generate invoice
     if (status === 'accepted' && isClient) {
+      const project = existingApplication.project;
+      const projectBudget = project?.budgetAmount ?? 0;
+      
       await prisma.project.update({
         where: { id: existingApplication.projectId },
         data: {
@@ -219,6 +310,18 @@ export async function PUT(
         },
         data: { status: 'rejected' },
       });
+
+      // Auto-generate invoice for the project if budget is defined
+      if (project && projectBudget > 0) {
+        await createProjectInvoice(
+          project.id,
+          project.title,
+          project.clientId,
+          existingApplication.freelancerId,
+          projectBudget,
+          project.budgetCurrency
+        );
+      }
     }
 
     // Transform to snake_case for API compatibility

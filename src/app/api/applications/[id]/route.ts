@@ -2,6 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, generateUUID } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
+
+// Type alias for Prisma transaction client
+type TransactionClient = Prisma.TransactionClient;
 
 // Constants for invoice generation
 const DEFAULT_INVOICE_DUE_DAYS = 30;
@@ -13,7 +17,7 @@ const DEFAULT_CURRENCY = 'USD';
  * Must be called within a transaction to prevent race conditions
  */
 async function generateInvoiceNumberInTransaction(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+  tx: TransactionClient
 ): Promise<string> {
   const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
   const prefix = `${INVOICE_PREFIX}-${yearMonth}-`;
@@ -60,7 +64,7 @@ async function createProjectInvoice(
         clientId,
         freelancerId,
         amount,
-        currency: currency || DEFAULT_CURRENCY,
+        currency: currency ?? DEFAULT_CURRENCY,
         dueDate,
         description: `Invoice for project: ${projectTitle}`,
         notes: 'Auto-generated invoice upon project assignment.',

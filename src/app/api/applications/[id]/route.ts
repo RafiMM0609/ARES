@@ -3,6 +3,84 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma, generateUUID } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
 
+// Constants for invoice generation
+const DEFAULT_INVOICE_DUE_DAYS = 30;
+const INVOICE_PREFIX = 'INV';
+const DEFAULT_CURRENCY = 'USD';
+
+/**
+ * Generates a unique invoice number in format: INV-YYYYMM-XXXX
+ * Must be called within a transaction to prevent race conditions
+ */
+async function generateInvoiceNumberInTransaction(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+): Promise<string> {
+  const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
+  const prefix = `${INVOICE_PREFIX}-${yearMonth}-`;
+  
+  const lastInvoice = await tx.invoice.findFirst({
+    where: { invoiceNumber: { startsWith: prefix } },
+    orderBy: { invoiceNumber: 'desc' },
+  });
+
+  let sequenceNum = 1;
+  if (lastInvoice) {
+    const lastSeq = parseInt(lastInvoice.invoiceNumber.slice(-4), 10);
+    if (!isNaN(lastSeq)) {
+      sequenceNum = lastSeq + 1;
+    }
+  }
+  
+  return `${prefix}${sequenceNum.toString().padStart(4, '0')}`;
+}
+
+/**
+ * Creates an auto-generated invoice for a project assignment
+ */
+async function createProjectInvoice(
+  projectId: string,
+  projectTitle: string,
+  clientId: string,
+  freelancerId: string,
+  amount: number,
+  currency: string
+): Promise<void> {
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + DEFAULT_INVOICE_DUE_DAYS);
+
+  await prisma.$transaction(async (tx) => {
+    const invoiceId = generateUUID();
+    const invoiceNumber = await generateInvoiceNumberInTransaction(tx);
+    
+    await tx.invoice.create({
+      data: {
+        id: invoiceId,
+        invoiceNumber,
+        projectId,
+        clientId,
+        freelancerId,
+        amount,
+        currency: currency || DEFAULT_CURRENCY,
+        dueDate,
+        description: `Invoice for project: ${projectTitle}`,
+        notes: 'Auto-generated invoice upon project assignment.',
+        status: 'draft',
+      },
+    });
+
+    await tx.invoiceItem.create({
+      data: {
+        id: generateUUID(),
+        invoiceId,
+        description: `Project: ${projectTitle}`,
+        quantity: 1,
+        unitPrice: amount,
+        total: amount,
+      },
+    });
+  });
+}
+
 // Get a single application
 export async function GET(
   request: NextRequest,
@@ -231,65 +309,14 @@ export async function PUT(
 
       // Auto-generate invoice for the project if budget is defined
       if (project && projectBudget > 0) {
-        // Calculate due date (30 days from now by default)
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 30);
-
-        // Use transaction to ensure invoice number generation and creation are atomic
-        await prisma.$transaction(async (tx) => {
-          const invoiceId = generateUUID();
-          
-          // Generate invoice number inside transaction to prevent race conditions
-          const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
-          const lastInvoice = await tx.invoice.findFirst({
-            where: {
-              invoiceNumber: {
-                startsWith: `INV-${yearMonth}-`,
-              },
-            },
-            orderBy: {
-              invoiceNumber: 'desc',
-            },
-          });
-
-          let sequenceNum = 1;
-          if (lastInvoice) {
-            const lastSeq = parseInt(lastInvoice.invoiceNumber.slice(-4), 10);
-            if (!isNaN(lastSeq)) {
-              sequenceNum = lastSeq + 1;
-            }
-          }
-          const invoiceNumber = `INV-${yearMonth}-${sequenceNum.toString().padStart(4, '0')}`;
-          
-          // Create the invoice
-          await tx.invoice.create({
-            data: {
-              id: invoiceId,
-              invoiceNumber,
-              projectId: project.id,
-              clientId: project.clientId,
-              freelancerId: existingApplication.freelancerId,
-              amount: projectBudget,
-              currency: project.budgetCurrency || 'USD',
-              dueDate,
-              description: `Invoice for project: ${project.title}`,
-              notes: 'Auto-generated invoice upon project assignment.',
-              status: 'draft',
-            },
-          });
-
-          // Create invoice item for the project
-          await tx.invoiceItem.create({
-            data: {
-              id: generateUUID(),
-              invoiceId,
-              description: `Project: ${project.title}`,
-              quantity: 1,
-              unitPrice: projectBudget,
-              total: projectBudget,
-            },
-          });
-        });
+        await createProjectInvoice(
+          project.id,
+          project.title,
+          project.clientId,
+          existingApplication.freelancerId,
+          projectBudget,
+          project.budgetCurrency
+        );
       }
     }
 

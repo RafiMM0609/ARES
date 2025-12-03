@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
             id: true,
             fullName: true,
             email: true,
+            walletAddress: true,
           },
         },
         project: {
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest) {
           id: invoice.freelancer.id,
           full_name: invoice.freelancer.fullName,
           email: invoice.freelancer.email,
+          wallet_address: invoice.freelancer.walletAddress,
         },
         project: invoice.project ? {
           id: invoice.project.id,

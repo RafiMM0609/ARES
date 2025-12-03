@@ -3,7 +3,6 @@ import { apiClient } from './api-client';
 import type { Database } from '@/lib/database.types';
 
 type Payment = Database['public']['Tables']['payments']['Row'];
-type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
 type PaymentUpdate = Database['public']['Tables']['payments']['Update'];
 
 export interface PaymentWithRelations extends Payment {
@@ -32,6 +31,16 @@ export interface PaymentResponse {
   payment: PaymentWithRelations;
 }
 
+export interface CreatePaymentData {
+  invoice_id: string;
+  payee_id: string;
+  amount: number;
+  currency?: string;
+  payment_method?: 'wallet' | 'bank_transfer' | 'crypto' | 'card';
+  transaction_hash?: string;
+  notes?: string;
+}
+
 export const paymentService = {
   getPayments: async (params?: { status?: string }): Promise<PaymentsResponse> => {
     const query = params?.status ? `?status=${params.status}` : '';
@@ -42,7 +51,7 @@ export const paymentService = {
     return apiClient.get<PaymentResponse>(`/payments/${id}`);
   },
 
-  createPayment: async (data: PaymentInsert): Promise<PaymentResponse> => {
+  createPayment: async (data: CreatePaymentData): Promise<PaymentResponse> => {
     return apiClient.post<PaymentResponse>('/payments', data);
   },
 

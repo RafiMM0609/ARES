@@ -17,6 +17,7 @@ export interface InvoiceWithRelations extends Invoice {
     id: string;
     full_name: string | null;
     email: string;
+    wallet_address?: string | null;
   };
   project?: {
     id: string;

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { StatusBadge } from '@/components/ui';
 import type { InvoiceWithRelations } from '@/services';
 
@@ -14,6 +15,11 @@ export function InvoiceTable({ invoices, viewType }: InvoiceTableProps) {
   }
 
   const counterpartLabel = viewType === 'client' ? 'Freelancer' : 'Client';
+  const isClient = viewType === 'client';
+
+  const canPayInvoice = (status: string) => {
+    return isClient && status !== 'paid' && status !== 'cancelled';
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -26,6 +32,9 @@ export function InvoiceTable({ invoices, viewType }: InvoiceTableProps) {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
+            {isClient && (
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+            )}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -52,6 +61,20 @@ export function InvoiceTable({ invoices, viewType }: InvoiceTableProps) {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}
                 </td>
+                {isClient && (
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {canPayInvoice(invoice.status) ? (
+                      <Link
+                        href={`/checkout?invoice=${invoice.id}`}
+                        className="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors"
+                      >
+                        Pay Now
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400 text-sm">-</span>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}

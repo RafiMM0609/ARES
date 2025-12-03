@@ -16,6 +16,6 @@ export type { SignupData, LoginData, AuthResponse } from './auth.service';
 export type { ProfileResponse, SkillsResponse } from './user.service';
 export type { ProjectWithRelations, ProjectsResponse, ProjectResponse } from './project.service';
 export type { InvoiceWithRelations, InvoicesResponse, InvoiceResponse, CreateInvoiceData } from './invoice.service';
-export type { PaymentWithRelations, PaymentsResponse, PaymentResponse } from './payment.service';
+export type { PaymentWithRelations, PaymentsResponse, PaymentResponse, CreatePaymentData } from './payment.service';
 export type { ApplicationWithRelations, ApplicationsResponse, ApplicationResponse, CreateApplicationData, UpdateApplicationData } from './application.service';
 export type { WalletState, TransactionResult } from './wallet.service';

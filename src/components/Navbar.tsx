@@ -75,6 +75,16 @@ export default function Navbar() {
               >
                 Applications
               </Link>
+              {(userType === 'client' || userType === 'both') && (
+                <Link 
+                  href="/checkout" 
+                  className={`hover:bg-blue-700 px-3 py-2 rounded transition-colors ${
+                    pathname === '/checkout' ? 'bg-blue-700' : ''
+                  }`}
+                >
+                  Checkout
+                </Link>
+              )}
               <Link 
                 href="/settings" 
                 className={`hover:bg-blue-700 px-3 py-2 rounded transition-colors ${

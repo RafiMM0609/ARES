@@ -198,13 +198,18 @@ ARES integrates with QI Network (QIE Blockchain) for crypto payments:
 - **QI Network Support**: Automatic network switching and configuration
 - **Balance Display**: Real-time QIE balance display
 - **Payment Integration**: Send and receive QIE tokens
+- **Smart Contract Support**: Full Ethers.js v6 utilities for contract interactions
+- **Transaction Monitoring**: Real-time transaction status tracking
 
 ### Network Configuration
-- **Chain ID**: 5656
+- **Chain ID**: 5656 (Mainnet) / 6531 (Testnet)
 - **Currency**: QIE
 - **RPC URL**: https://rpc-main1.qiblockchain.online
+- **Block Explorer**: https://explorer.qiblockchain.online
 
-### Usage
+### Quick Start
+
+#### React Hook Usage
 ```typescript
 import { useWallet } from '@/hooks';
 import { WalletConnect } from '@/components/wallet';
@@ -215,6 +220,28 @@ const { isConnected, address, balance, connect, disconnect } = useWallet();
 // Component for wallet connection UI
 <WalletConnect showBalance={true} showNetworkStatus={true} />
 ```
+
+#### Ethers.js Utilities
+```typescript
+import { 
+  sendQIE, 
+  waitForConfirmation,
+  getContract,
+  formatCurrency 
+} from '@/lib';
+
+// Send QIE tokens
+const tx = await sendQIE(recipientAddress, '1.5');
+const receipt = await waitForConfirmation(tx.hash, 2);
+
+// Interact with smart contracts
+const contract = await getContract(contractAddress, abi, true);
+const result = await contract.transfer(to, amount);
+```
+
+### Documentation
+- **[ETHERS_SETUP_GUIDE.md](ETHERS_SETUP_GUIDE.md)** - Complete Ethers.js API reference and examples
+- **[examples/](examples/)** - Practical code examples for common use cases
 
 ## 🔐 Security
 

@@ -3,7 +3,6 @@
 
 import { ethers, TransactionRequest, TransactionResponse, TransactionReceipt } from 'ethers';
 import { getBrowserProvider, getQIRpcProvider, getSigner, getGasPrice } from './ethers-setup';
-import { parseEther, formatEther } from 'ethers';
 
 /**
  * Transaction status enum
@@ -28,7 +27,7 @@ export async function buildTransferTransaction(
   
   const transaction: TransactionRequest = {
     to: toAddress,
-    value: parseEther(amount),
+    value: ethers.parseEther(amount),
     gasPrice,
     gasLimit: BigInt(21000), // Standard gas limit for simple transfers
   };
@@ -59,7 +58,7 @@ export async function buildTransaction(params: {
   };
 
   if (params.value) {
-    transaction.value = parseEther(params.value);
+    transaction.value = ethers.parseEther(params.value);
   }
 
   if (params.data) {
@@ -178,7 +177,7 @@ export function calculateTransactionFee(receipt: TransactionReceipt): string {
   const gasUsed = receipt.gasUsed;
   const gasPrice = receipt.gasPrice;
   const fee = gasUsed * gasPrice;
-  return formatEther(fee);
+  return ethers.formatEther(fee);
 }
 
 /**
@@ -215,7 +214,7 @@ export async function estimateTransactionCost(transaction: TransactionRequest): 
   const gasPrice = transaction.gasPrice || feeData.gasPrice || BigInt(0);
   
   const cost = gasLimit * BigInt(gasPrice.toString());
-  return formatEther(cost);
+  return ethers.formatEther(cost);
 }
 
 /**
@@ -227,8 +226,10 @@ export async function getRecommendedGasPrice(multiplier: number = 1.0): Promise<
   const feeData = await provider.getFeeData();
   const baseGasPrice = feeData.gasPrice || BigInt(0);
   
-  // Apply multiplier and convert to bigint
-  const adjustedPrice = BigInt(Math.floor(Number(baseGasPrice) * multiplier));
+  // Use bigint arithmetic to avoid precision loss
+  // Multiply by 100, apply multiplier, then divide by 100
+  const multiplierBigInt = BigInt(Math.floor(multiplier * 100));
+  const adjustedPrice = (baseGasPrice * multiplierBigInt) / BigInt(100);
   return adjustedPrice;
 }
 

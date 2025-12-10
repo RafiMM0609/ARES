@@ -16,12 +16,13 @@ export * from './web3-utils';
 // QI Network configuration
 export * from './qi-network';
 
-// Wallet authentication (has normalizeAddress - will be shadowed by web3-utils version)
+// Wallet authentication utilities
 export {
   generateNonce,
   createSignMessage,
   verifyWalletSignature,
   isValidWalletAddress,
+  normalizeAddress as normalizeWalletAddress, // Renamed to avoid shadowing
 } from './wallet-auth';
 
 // Wallet constants

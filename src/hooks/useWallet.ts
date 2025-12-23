@@ -117,8 +117,18 @@ export function useWallet(): UseWalletReturn {
         });
         return true;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Auto-connect failed:', err);
+      // Handle specific error codes
+      if (err.code === -32001 && err.message?.includes('Already processing connect')) {
+        // Wallet is already processing a connection request, retry after a short delay
+        setTimeout(() => {
+          if (isMounted.current && !stateRef.current.isConnected) {
+            autoConnect();
+          }
+        }, 1000);
+        return false;
+      }
       // If auto-connect fails, clear the preference
       setWalletConnected(false);
     }
@@ -370,8 +380,10 @@ export function useWallet(): UseWalletReturn {
 
     return () => {
       isMounted.current = false;
-      ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      ethereum.removeListener('chainChanged', handleChainChanged);
+      if (ethereum && typeof ethereum.removeListener === 'function') {
+        ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        ethereum.removeListener('chainChanged', handleChainChanged);
+      }
     };
   }, [checkConnection, autoConnect]);
 

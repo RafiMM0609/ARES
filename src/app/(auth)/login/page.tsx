@@ -75,7 +75,7 @@ export default function LoginPage() {
         {/* Login Method Tabs */}
         <div className="flex border-b border-gray-200 mb-6">
           <button
-            type="button"
+          type="button"
             onClick={() => setLoginMethod('email')}
             className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
               loginMethod === 'email'
